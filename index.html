@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MarcDBeats</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  
+  <!-- Supabase Auth -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Combined Application Script -->
+  <script>
+    console.log('=== MARCDBEATS STARTING ===');
+    
+    // =============================================================
+    // AIRTABLE LOADER
+    // =============================================================
+    console.log('Airtable manual loader initializing...');
+    window.Airtable = function(config) {
+      return {
+        base: function(baseId) {
+          return {
+            table: function(tableName) {
+              return {
+                select: function(options) {
+                  return {
+                    all: function() {
+                      let url = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=100`;
+                      if (options && options.sort) {
+                        options.sort.forEach((sort, i) => {
+                          url += `&sort[${i}][field]=${sort.field}&sort[${i}][direction]=${sort.direction || 'asc'}`;
+                        });
+                      }
+                      return fetch(url, {
+                        headers: { 'Authorization': `Bearer ${config.apiKey}` }
+                      })
+                      .then(res => {
+                        if (!res.ok) throw new Error(`Airtable API error: ${res.status}`);
+                        return res.json();
+                      })
+                      .then(data => data.records);
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+      };
+    };
+    console.log('Airtable manual loader ready');
+
+    // =============================================================
+    // 📦 AIRTABLE CONFIG
+    // =============================================================
+    const AIRTABLE_API_KEY = 'patXlK1NDRgNvhp9f.30afab25795e972c754f9e62a4abb7c29002f1dc53020ed1d937f39fe73ffd14';
+    const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
+    const AIRTABLE_TABLE_NAME = 'Beats';
+
+    // =============================================================
+    // 📦 SUPABASE CONFIG
+    // =============================================================
+    const SUPABASE_URL = 'https://your-project.supabase.co';
+    const SUPABASE_ANON_KEY = 'your-anon-key';
+
+    // THIS IS THE ONLY supabase VARIABLE IN THE ENTIRE FILE
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('Supabase initialized');
+
+    // =============================================================
+    // 📦 STATE
+    // =============================================================
+    const state = {
+      currentIndex: 0,
+      currentBeat: null,
+      isPlaying: false,
+      user: null,
+      likes: [],
+      purchases: [],
+      cart: [],
+      isGuest: true,
+      onboardingShown: false,
+      beats: [],
+      playlists: [],
+      singles: [],
+      featured: [],
+      loaded: false,
+      playerQueue: []
+    };
+
+    // =============================================================
+    // 🛠️ HELPERS
+    // =============================================================
+    function showToast(msg, icon = 'fa-info-circle') {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      document.getElementById('toastMsg').textContent = msg;
+      toast.querySelector('i').className = `fas ${icon}`;
+      toast.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function isLiked(beatId) { return state.likes.includes(beatId); }
+    function isLoggedIn() { return state.user !== null; }
+    function formatPrice(price) { return `$${price.toFixed(2)}`; }
+    function formatViews(views) {
+      if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
+      if (views >= 1000) return `${(views / 1000).toFixed(0)}K`;
+      return views.toString();
+    }
+    function getBeat(id) { return state.beats.find(b => b.id === id); }
+    function getPlaylistBeats(playlistId) {
+      const playlist = state.playlists.find(p => p.id === playlistId);
+      if (!playlist) return [];
+      return playlist.beats;
+    }
+    function getSingles() { return state.singles; }
+    function getAllBeats() { return state.beats; }
+    function getPlaylist(id) { return state.playlists.find(p => p.id === id); }
+    function getAllPlaylists() { return state.playlists; }
+    function hasVideo(beat) { return beat.video && beat.video.length > 0; }
+    function getBeatMedia(beat) {
+      if (hasVideo(beat)) return beat.video;
+      if (beat.artwork) return beat.artwork;
+      return '/assets/artwork/default-cover.jpg';
+    }
+    function getPlaylistCover(playlist) {
+      if (playlist.cover) return playlist.cover;
+      const firstBeat = playlist.beats[0];
+      return firstBeat?.artwork || '/assets/artwork/default-cover.jpg';
+    }
+
+    // =============================================================
+    // 🔐 AUTH FUNCTIONS
+    // =============================================================
+    async function signUp(email, password) {
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        state.user = data.user;
+        state.isGuest = false;
+        await loadUserData();
+        updateUI();
+        showToast('Account created! Welcome.', 'fa-user-check');
+        return true;
+      } catch (error) {
+        showToast(error.message, 'fa-exclamation-circle');
+        return false;
+      }
+    }
+
+    async function signIn(email, password) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        state.user = data.user;
+        state.isGuest = false;
+        await loadUserData();
+        updateUI();
+        showToast('Welcome back!', 'fa-user-check');
+        return true;
+      } catch (error) {
+        showToast(error.message, 'fa-exclamation-circle');
+        return false;
+      }
+    }
+
+    async function signOut() {
+      try {
+        await supabase.auth.signOut();
+        state.user = null;
+        state.isGuest = true;
+        state.likes = [];
+        state.purchases = [];
+        updateUI();
+        showToast('Signed out', 'fa-sign-out-alt');
+        closeAllViews();
+      } catch (error) {
+        showToast(error.message, 'fa-exclamation-circle');
+      }
+    }
+
+    // =============================================================
+    // 💾 USER DATA
+    // =============================================================
+    async function loadUserData() {
+      if (!state.user) return;
+      try {
+        const { data: likesData, error: likesError } = await supabase
+          .from('likes')
+          .select('beat_id')
+          .eq('member_id', state.user.id);
+        if (!likesError) state.likes = likesData.map(l => l.beat_id);
+
+        const { data: purchasesData, error: purchasesError } = await supabase
+          .from('purchases')
+          .select('*')
+          .eq('member_id', state.user.id);
+        if (!purchasesError) state.purchases = purchasesData;
+
+        updateUI();
+      } catch (error) {
+        console.warn('Could not load user data:', error);
+      }
+    }
+
+    async function toggleLike(beatId) {
+      if (!isLoggedIn()) {
+        showToast('Please sign in to like beats', 'fa-sign-in-alt');
+        return;
+      }
+      const isLikedNow = isLiked(beatId);
+      try {
+        if (isLikedNow) {
+          const { error } = await supabase
+            .from('likes')
+            .delete()
+            .eq('member_id', state.user.id)
+            .eq('beat_id', beatId);
+          if (!error) {
+            state.likes = state.likes.filter(id => id !== beatId);
+            showToast('Removed like', 'fa-heart-broken');
+          }
+        } else {
+          const { error } = await supabase
+            .from('likes')
+            .insert({ member_id: state.user.id, beat_id: beatId });
+          if (!error) {
+            state.likes.push(beatId);
+            const likeBtn = document.getElementById('likeBtn');
+            if (likeBtn) {
+              likeBtn.classList.add('like-animation');
+              setTimeout(() => likeBtn.classList.remove('like-animation'), 500);
+            }
+            showToast('Liked!', 'fa-heart');
+          }
+        }
+        updateUI();
+      } catch (error) {
+        showToast(error.message, 'fa-exclamation-circle');
+      }
+    }
+
+    // =============================================================
+    // 🛒 CART FUNCTIONS
+    // =============================================================
+    function addToCart(beatId) {
+      const beat = getBeat(beatId);
+      if (!beat) return;
+      if (state.cart.find(b => b.id === beatId)) {
+        showToast('Already in cart', 'fa-exclamation-circle');
+        return;
+      }
+      state.cart.push(beat);
+      updateCartBadge();
+      showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
+    }
+
+    function removeFromCart(beatId) {
+      state.cart = state.cart.filter(b => b.id !== beatId);
+      updateCartBadge();
+      renderCartModal();
+    }
+
+    function updateCartBadge() {
+      const badge = document.getElementById('cartBadge');
+      if (badge) {
+        badge.textContent = state.cart.length;
+        badge.style.display = state.cart.length > 0 ? 'flex' : 'none';
+      }
+    }
+
+    // =============================================================
+    // 📦 LOAD DATA FROM AIRTABLE
+    // =============================================================
+    async function loadBeatData() {
+      try {
+        let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
+        console.log('Fetching from Airtable:', url);
+
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Airtable API error: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Airtable response:', data);
+
+        if (!data.records || data.records.length === 0) {
+          console.warn('No records found in Airtable');
+          state.beats = [];
+          state.loaded = true;
+          renderDiscover(0);
+          renderFeatured();
+          renderPlaylists();
+          renderSingles();
+          updateUI();
+          showToast('No beats found in Airtable', 'fa-exclamation-circle');
+          return;
+        }
+
+        state.beats = data.records.map(record => ({
+          id: parseInt(record.id, 36),
+          title: record.fields['Beat name'] || 'Untitled',
+          artist: record.fields['Artist'] || 'Unknown',
+          genre: record.fields['Genre'] || '',
+          price: record.fields['Price'] || 0,
+          bpm: record.fields['BPM'] || '',
+          artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
+          video: record.fields['Video'] || '',
+          mp3: record.fields['MP3'] || '',
+          views: 0,
+          socialLikes: 0,
+          tags: record.fields['Tags'] || [],
+          duration: '',
+          releaseDate: '',
+          playlist: record.fields['Playlist'] || '',
+          isSingle: record.fields['Is Single'] || false,
+          trackNumber: record.fields['Track Number'] || 999,
+          featured: record.fields['Featured'] || false,
+          tikTok: record.fields['Tik Tok'] || '',
+          instagram: record.fields['Instagram'] || '',
+          searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
+        }));
+
+        state.featured = state.beats.filter(b => b.featured === true);
+        state.singles = state.beats.filter(beat => beat.isSingle === true);
+
+        const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
+        state.playlists = playlistIds.map(id => ({
+          id: id,
+          name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
+        }));
+
+        state.loaded = true;
+
+        renderDiscover(0);
+        renderFeatured();
+        renderPlaylists();
+        renderSingles();
+        updateUI();
+
+        console.log(`Loaded ${state.beats.length} beats from Airtable`);
+        console.log(`${state.playlists.length} playlists`);
+        console.log(`${state.singles.length} singles`);
+        console.log(`${state.featured.length} featured`);
+        showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
+      } catch (error) {
+        console.error('Failed to load data from Airtable:', error);
+        showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
+        state.loaded = true;
+      }
+    }
+
+    // =============================================================
+    // 🔍 SEARCH
+    // =============================================================
+    function searchBeats(query) {
+      if (!query || query.trim().length < 2) {
+        renderDiscover(0);
+        return;
+      }
+      const q = query.toLowerCase().trim();
+      const results = state.beats.filter(beat =>
+        beat.title.toLowerCase().includes(q) ||
+        beat.artist.toLowerCase().includes(q) ||
+        beat.genre.toLowerCase().includes(q) ||
+        beat.searchKeywords.toLowerCase().includes(q)
+      );
+      if (results.length === 0) {
+        showToast('No beats found', 'fa-search');
+        return;
+      }
+      const container = document.getElementById('swipeContainer');
+      if (!container) return;
+      container.querySelectorAll('.swipe-card').forEach(c => c.remove());
+      const beat = results[0];
+      state.currentBeat = beat;
+      renderCard(beat, 0, results);
+    }
+
+    // =============================================================
+    // 🎬 RENDER CARD (Simplified for testing)
+    // =============================================================
+    function renderCard(beat, index, queue) {
+      const container = document.getElementById('swipeContainer');
+      if (!container) return;
+      
+      container.innerHTML = `
+        <div style="padding:20px;background:var(--bg-card);border-radius:20px;text-align:center;">
+          <h2>${beat.title}</h2>
+          <p>${beat.artist}</p>
+          <p>${formatPrice(beat.price)}</p>
+          <p style="color:var(--text-muted);">${beat.genre}</p>
+        </div>
+      `;
+      
+      state.playerQueue = queue || state.beats;
+      state.currentIndex = index;
+      updatePlayer(beat);
+    }
+
+    function nextBeat() {
+      const queue = state.playerQueue;
+      const nextIndex = state.currentIndex + 1;
+      if (nextIndex >= queue.length) {
+        showToast('All beats viewed', 'fa-check-circle');
+        return;
+      }
+      renderCard(queue[nextIndex], nextIndex, queue);
+    }
+
+    function prevBeat() {
+      const queue = state.playerQueue;
+      const prevIndex = state.currentIndex - 1;
+      if (prevIndex < 0) return;
+      renderCard(queue[prevIndex], prevIndex, queue);
+    }
+
+    function renderDiscover(index) {
+      const beats = state.beats;
+      const container = document.getElementById('swipeContainer');
+      if (!container) return;
+      
+      if (beats.length === 0) {
+        container.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);padding:40px;text-align:center;">
+            <i class="fas fa-music" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
+            <h3>No beats found</h3>
+            <p>Add beats to your Airtable to get started.</p>
+          </div>
+        `;
+        return;
+      }
+      if (index >= beats.length) index = 0;
+      if (index < 0) index = beats.length - 1;
+      renderCard(beats[index], index, beats);
+    }
+
+    // =============================================================
+    // 🎵 PLAYER
+    // =============================================================
+    function updatePlayer(beat) {
+      if (!beat) return;
+      const titleEl = document.getElementById('playerTitle');
+      const artistEl = document.getElementById('playerArtist');
+      if (titleEl) titleEl.textContent = beat.title;
+      if (artistEl) artistEl.textContent = beat.artist;
+    }
+
+    // =============================================================
+    // 🛒 CART MODAL (Simplified)
+    // =============================================================
+    function renderCartModal() {
+      const modalBox = document.getElementById('modalBox');
+      if (!modalBox) return;
+
+      if (state.cart.length === 0) {
+        modalBox.innerHTML = `
+          <h2>Your Cart</h2>
+          <p class="sub">Your cart is empty</p>
+          <button class="btn-secondary" id="closeCart">Continue Browsing</button>
+        `;
+        document.getElementById('closeCart')?.addEventListener('click', () => {
+          document.getElementById('modalOverlay')?.classList.remove('active');
+        });
+        document.getElementById('modalOverlay')?.classList.add('active');
+        return;
+      }
+
+      let total = 0;
+      modalBox.innerHTML = `
+        <h2>Your Cart (${state.cart.length})</h2>
+        <p class="sub">Review your beats before checkout</p>
+        ${state.cart.map(beat => {
+          total += beat.price;
+          return `
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;">
+              <span>${beat.title}</span>
+              <span>${formatPrice(beat.price)}</span>
+            </div>
+          `;
+        }).join('')}
+        <div style="padding:12px 0;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;">
+          <strong>Total</strong>
+          <strong style="color:var(--accent);">${formatPrice(total)}</strong>
+        </div>
+        <button class="btn-primary" id="checkoutCart">Checkout</button>
+        <button class="btn-secondary" id="closeCart">Continue Browsing</button>
+      `;
+
+      document.getElementById('checkoutCart')?.addEventListener('click', () => {
+        document.getElementById('modalOverlay').classList.remove('active');
+        showToast('Checkout coming soon!', 'fa-check');
+      });
+
+      document.getElementById('closeCart')?.addEventListener('click', () => {
+        document.getElementById('modalOverlay').classList.remove('active');
+      });
+
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    // =============================================================
+    // 🔐 AUTH MODAL
+    // =============================================================
+    function showAuthModal() {
+      const modalBox = document.getElementById('modalBox');
+      if (!modalBox) return;
+      
+      modalBox.innerHTML = `
+        <h2 id="authTitle">Welcome</h2>
+        <p class="sub" id="authSub">Sign in or create an account</p>
+        <label>Email</label>
+        <input type="email" id="authEmail" placeholder="artist@email.com" />
+        <label>Password</label>
+        <input type="password" id="authPassword" placeholder="Enter your password" />
+        <button class="btn-primary" id="authSubmit">Sign In</button>
+        <button class="btn-secondary" id="cancelAuth">Cancel</button>
+        <div class="switch-auth">
+          <span id="authSwitchText">Don't have an account?</span>
+          <a id="authSwitch">Create one</a>
+        </div>
+        <div class="terms">By continuing, you agree to our Terms & Policies</div>
+      `;
+
+      document.getElementById('modalOverlay').classList.add('active');
+
+      document.getElementById('cancelAuth')?.addEventListener('click', () => {
+        document.getElementById('modalOverlay').classList.remove('active');
+      });
+
+      let isLogin = true;
+      document.getElementById('authSwitch')?.addEventListener('click', () => {
+        isLogin = !isLogin;
+        document.getElementById('authTitle').textContent = isLogin ? 'Welcome' : 'Create Account';
+        document.getElementById('authSub').textContent = isLogin ? 'Sign in to your account' : 'Create an account';
+        document.getElementById('authSubmit').textContent = isLogin ? 'Sign In' : 'Create Account';
+        document.getElementById('authSwitchText').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
+        document.getElementById('authSwitch').textContent = isLogin ? 'Create one' : 'Sign in';
+      });
+
+      document.getElementById('authSubmit')?.addEventListener('click', async () => {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value.trim();
+        if (!email || !password) {
+          showToast('Please enter email and password', 'fa-exclamation-circle');
+          return;
+        }
+        let success;
+        if (isLogin) success = await signIn(email, password);
+        else success = await signUp(email, password);
+        if (success) {
+          document.getElementById('modalOverlay').classList.remove('active');
+          updateUI();
+        }
+      });
+    }
+
+    // =============================================================
+    // 👤 PORTAL (Simplified)
+    // =============================================================
+    function renderPortal() {
+      const content = document.getElementById('portalContent');
+      if (!content) return;
+
+      if (!isLoggedIn()) {
+        content.innerHTML = `
+          <div style="text-align:center;padding:32px;">
+            <h3>Sign in to access your account</h3>
+            <button class="btn-primary" id="portalSignIn" style="margin-top:16px;">Sign In</button>
+          </div>
+        `;
+        document.getElementById('portalSignIn')?.addEventListener('click', () => {
+          closeAllViews();
+          showAuthModal();
+        });
+        return;
+      }
+
+      const likedBeats = state.likes.map(id => getBeat(id)).filter(Boolean);
+      const purchasedBeats = state.purchases.map(p => ({ ...getBeat(p.beat_id), purchase: p })).filter(b => b.id);
+
+      content.innerHTML = `
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
+          <h3>Profile</h3>
+          <p><strong>Email:</strong> ${state.user.email}</p>
+          <button class="btn-secondary" id="signOutBtn" style="margin-top:12px;">Sign Out</button>
+        </div>
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
+          <h3>Likes (${likedBeats.length})</h3>
+          ${likedBeats.length === 0 ? '<p>No likes yet.</p>' : likedBeats.map(beat => `<p>${beat.title}</p>`).join('')}
+        </div>
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;">
+          <h3>Purchases (${purchasedBeats.length})</h3>
+          ${purchasedBeats.length === 0 ? '<p>No purchases yet.</p>' : purchasedBeats.map(({ title, purchase }) => `<p>${title} - ${formatPrice(purchase.price)}</p>`).join('')}
+        </div>
+      `;
+
+      document.getElementById('signOutBtn')?.addEventListener('click', signOut);
+    }
+
+    // =============================================================
+    // 📀 RENDER PLAYLISTS (Simplified)
+    // =============================================================
+    function renderPlaylists() {
+      const grid = document.getElementById('playlistGrid');
+      if (!grid) return;
+      
+      const playlists = state.playlists;
+      if (playlists.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-muted);">No playlists yet</p>';
+        return;
+      }
+
+      grid.innerHTML = playlists.map(playlist => `
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:1px solid var(--border-subtle);">
+          <h3>${playlist.name}</h3>
+          <p style="color:var(--text-muted);font-size:14px;">${playlist.beats.length} beats</p>
+        </div>
+      `).join('');
+    }
+
+    // =============================================================
+    // 🎧 RENDER SINGLES (Simplified)
+    // =============================================================
+    function renderSingles() {
+      const grid = document.getElementById('singlesGrid');
+      if (!grid) return;
+      
+      const singles = state.singles;
+      if (singles.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-muted);">No singles yet</p>';
+        return;
+      }
+
+      grid.innerHTML = singles.map(beat => `
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:1px solid var(--border-subtle);">
+          <h3>${beat.title}</h3>
+          <p style="color:var(--text-muted);font-size:14px;">${beat.artist}</p>
+          <p style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</p>
+        </div>
+      `).join('');
+    }
+
+    // =============================================================
+    // ⭐ RENDER FEATURED (Simplified)
+    // =============================================================
+    function renderFeatured() {
+      const grid = document.getElementById('featuredGrid');
+      if (!grid) return;
+      
+      const featured = state.featured;
+      if (featured.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-muted);">No featured beats</p>';
+        return;
+      }
+
+      grid.innerHTML = featured.map(beat => `
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:2px solid var(--accent);">
+          <h3>${beat.title}</h3>
+          <p style="color:var(--text-muted);font-size:14px;">${beat.artist}</p>
+          <p style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</p>
+        </div>
+      `).join('');
+    }
+
+    // =============================================================
+    // 🔄 TAB SWITCHING
+    // =============================================================
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+      document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
+
+      document.querySelectorAll('.discover-view, .featured-view, .playlists-view, .singles-view').forEach(v => v.classList.remove('active'));
+      document.getElementById(`${tab}View`)?.classList.add('active');
+
+      if (tab === 'featured') renderFeatured();
+      if (tab === 'playlists') renderPlaylists();
+      if (tab === 'singles') renderSingles();
+    }
+
+    // =============================================================
+    // 🧭 NAVIGATION HELPERS
+    // =============================================================
+    function closeAllViews() {
+      document.getElementById('playlistDetail')?.classList.remove('active');
+      document.getElementById('portalView')?.classList.remove('active');
+      document.getElementById('termsView')?.classList.remove('active');
+      document.getElementById('modalOverlay')?.classList.remove('active');
+    }
+
+    function showPortal() {
+      closeAllViews();
+      document.getElementById('portalView')?.classList.add('active');
+      renderPortal();
+    }
+
+    function showTerms() {
+      closeAllViews();
+      document.getElementById('termsView')?.classList.add('active');
+      renderTerms();
+    }
+
+    function renderTerms() {
+      const content = document.getElementById('termsContent');
+      if (!content) return;
+      content.innerHTML = `
+        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
+          <h3>License Agreement</h3>
+          <p>All beats are licensed, not sold.</p>
+        </div>
+      `;
+    }
+
+    // =============================================================
+    // 🔄 UI UPDATE
+    // =============================================================
+    function updateUI() {
+      const likesCount = state.likes.length;
+      const badge = document.getElementById('likesBadge');
+      if (badge) {
+        badge.style.display = likesCount > 0 ? 'block' : 'none';
+      }
+
+      const authBtn = document.getElementById('authNavBtn');
+      if (authBtn) {
+        if (isLoggedIn()) {
+          authBtn.textContent = state.user.email.split('@')[0];
+          authBtn.style.background = 'rgba(255,255,255,0.06)';
+          authBtn.style.color = 'var(--text-secondary)';
+        } else {
+          authBtn.textContent = 'Sign In';
+          authBtn.style.background = 'var(--gradient-1)';
+          authBtn.style.color = '#fff';
+        }
+      }
+
+      updateCartBadge();
+    }
+
+    // =============================================================
+    // 🚀 INIT
+    // =============================================================
+    async function init() {
+      console.log('=== INIT STARTING ===');
+      
+      if (supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            state.user = data.session.user;
+            state.isGuest = false;
+            await loadUserData();
+            updateUI();
+          }
+        } catch (e) {
+          console.warn('Supabase session check failed:', e);
+        }
+      }
+
+      await loadBeatData();
+
+      // Show onboarding
+      const overlay = document.getElementById('onboardingOverlay');
+      if (overlay) {
+        overlay.classList.add('active');
+        document.getElementById('onboardingStart')?.addEventListener('click', () => {
+          overlay.classList.remove('active');
+        });
+      }
+
+      console.log('=== INIT COMPLETE ===');
+    }
+
+    // =============================================================
+    // 🧭 NAVIGATION EVENTS
+    // =============================================================
+    document.querySelectorAll('.tab-nav button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeAllViews();
+        switchTab(btn.dataset.tab);
+      });
+    });
+
+    document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
+    document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
+    document.getElementById('termsNavBtn')?.addEventListener('click', showTerms);
+    document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
+    document.getElementById('detailBack')?.addEventListener('click', closeAllViews);
+
+    document.getElementById('authNavBtn')?.addEventListener('click', () => {
+      if (isLoggedIn()) {
+        showPortal();
+      } else {
+        showAuthModal();
+      }
+    });
+
+    document.getElementById('likesNavBtn')?.addEventListener('click', () => {
+      if (!isLoggedIn()) {
+        showToast('Please sign in to view your likes', 'fa-sign-in-alt');
+        showAuthModal();
+        return;
+      }
+      showPortal();
+    });
+
+    document.getElementById('cartNavBtn')?.addEventListener('click', renderCartModal);
+
+    document.getElementById('dislikeBtn')?.addEventListener('click', nextBeat);
+    document.getElementById('likeBtn')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        toggleLike(state.currentBeat.id);
+      }
+    });
+    document.getElementById('cartBtn')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        addToCart(state.currentBeat.id);
+      }
+    });
+    document.getElementById('buyBtn')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        showToast(`Buying "${state.currentBeat.title}"`, 'fa-arrow-up');
+      }
+    });
+    document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
+
+    document.getElementById('playerPlay')?.addEventListener('click', () => {
+      state.isPlaying = !state.isPlaying;
+      document.getElementById('playerPlay').innerHTML = state.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+      const title = document.getElementById('playerTitle')?.textContent;
+      showToast(state.isPlaying ? `Playing "${title}"` : 'Paused', state.isPlaying ? 'fa-play' : 'fa-pause');
+    });
+
+    document.getElementById('playerPrev')?.addEventListener('click', prevBeat);
+    document.getElementById('playerNext')?.addEventListener('click', nextBeat);
+
+    document.getElementById('playerLike')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        toggleLike(state.currentBeat.id);
+      }
+    });
+
+    document.getElementById('playerCart')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        addToCart(state.currentBeat.id);
+      }
+    });
+
+    document.getElementById('searchBtn')?.addEventListener('click', ()
