@@ -65,7 +65,7 @@
     const SUPABASE_ANON_KEY = 'your-anon-key';
 
     // THIS IS THE ONLY supabase VARIABLE IN THE ENTIRE FILE
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log('Supabase initialized');
 
     // =============================================================
