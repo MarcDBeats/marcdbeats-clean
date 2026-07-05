@@ -784,6 +784,13 @@
     // =============================================================
     // 🧭 NAVIGATION EVENTS
     // =============================================================
+  // =============================================================
+  // 🧭 NAVIGATION EVENTS (Wrapped in DOMContentLoaded)
+  // =============================================================
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded - attaching events');
+
+    // Tab navigation
     document.querySelectorAll('.tab-nav button').forEach(btn => {
       btn.addEventListener('click', () => {
         closeAllViews();
@@ -791,12 +798,14 @@
       });
     });
 
+    // Portal, Terms, Detail
     document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
     document.getElementById('termsNavBtn')?.addEventListener('click', showTerms);
     document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
     document.getElementById('detailBack')?.addEventListener('click', closeAllViews);
 
+    // Auth button
     document.getElementById('authNavBtn')?.addEventListener('click', () => {
       if (isLoggedIn()) {
         showPortal();
@@ -805,6 +814,7 @@
       }
     });
 
+    // Likes button
     document.getElementById('likesNavBtn')?.addEventListener('click', () => {
       if (!isLoggedIn()) {
         showToast('Please sign in to view your likes', 'fa-sign-in-alt');
@@ -814,8 +824,10 @@
       showPortal();
     });
 
+    // Cart button
     document.getElementById('cartNavBtn')?.addEventListener('click', renderCartModal);
 
+    // Discover buttons
     document.getElementById('dislikeBtn')?.addEventListener('click', nextBeat);
     document.getElementById('likeBtn')?.addEventListener('click', () => {
       if (state.currentBeat) {
@@ -834,33 +846,31 @@
     });
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
+    // Player buttons
     document.getElementById('playerPlay')?.addEventListener('click', () => {
       state.isPlaying = !state.isPlaying;
       document.getElementById('playerPlay').innerHTML = state.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
       const title = document.getElementById('playerTitle')?.textContent;
       showToast(state.isPlaying ? `Playing "${title}"` : 'Paused', state.isPlaying ? 'fa-play' : 'fa-pause');
     });
-
     document.getElementById('playerPrev')?.addEventListener('click', prevBeat);
     document.getElementById('playerNext')?.addEventListener('click', nextBeat);
-
     document.getElementById('playerLike')?.addEventListener('click', () => {
       if (state.currentBeat) {
         toggleLike(state.currentBeat.id);
       }
     });
-
     document.getElementById('playerCart')?.addEventListener('click', () => {
       if (state.currentBeat) {
         addToCart(state.currentBeat.id);
       }
     });
 
+    // Search
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       const query = document.getElementById('searchInput')?.value;
       if (query) searchBeats(query);
     });
-
     document.getElementById('searchInput')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const query = document.getElementById('searchInput')?.value;
@@ -868,6 +878,7 @@
       }
     });
 
+    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (document.getElementById('modalOverlay')?.classList.contains('active')) return;
 
@@ -893,12 +904,13 @@
         document.getElementById('cartBtn')?.click();
       }
     });
+  });
 
-    // =============================================================
-    // 🚀 START
-    // =============================================================
-    init();
-    console.log('MarcDBeats v7 loaded!');
+  // =============================================================
+  // 🚀 START
+  // =============================================================
+  init();
+  console.log('MarcDBeats v7 loaded!');
   </script>
   
   <style>
