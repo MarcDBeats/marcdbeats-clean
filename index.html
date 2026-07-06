@@ -438,6 +438,29 @@
     updatePlayer(beat);
   }
 
+  // =============================================================
+  // 🔄 NAVIGATION FUNCTIONS
+  // =============================================================
+  function prevBeat() {
+    const queue = state.playerQueue;
+    const prevIndex = state.currentIndex - 1;
+    if (prevIndex < 0) {
+      showToast('First beat', 'fa-info-circle');
+      return;
+    }
+    renderCard(queue[prevIndex], prevIndex, queue);
+  }
+
+  function nextBeat() {
+    const queue = state.playerQueue;
+    const nextIndex = state.currentIndex + 1;
+    if (nextIndex >= queue.length) {
+      showToast('All beats viewed', 'fa-check-circle');
+      return;
+    }
+    renderCard(queue[nextIndex], nextIndex, queue);
+  }
+    
       // =============================================================
   // 🔄 RENDER DISCOVER (Explore Tab)
   // =============================================================
