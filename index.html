@@ -441,7 +441,7 @@
         state.playerQueue = queue || state.beats;
     state.currentIndex = index;
     state.currentBeat = beat;
-    state.currentBeat.video = beat.video;
+    console.log('renderCard - currentBeat set to:', state.currentBeat);  // DEBUG
     updatePlayer(beat);
 
     // AUTO-PLAY AUDIO AND VIDEO WHEN BEAT CHANGES
