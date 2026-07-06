@@ -438,10 +438,28 @@
       </div>
     `;
     
-    state.playerQueue = queue || state.beats;
+        state.playerQueue = queue || state.beats;
     state.currentIndex = index;
-           state.currentBeat = beat;
+    state.currentBeat = beat;
     updatePlayer(beat);
+
+    // AUTO-PLAY AUDIO AND VIDEO WHEN BEAT CHANGES
+    const audio = document.getElementById('audioPlayer');
+    if (audio && beat.mp3) {
+        audio.play()
+            .then(() => {
+                state.isPlaying = true;
+                document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+            })
+            .catch(err => console.log('Audio autoplay blocked:', err));
+    }
+
+    setTimeout(() => {
+        const video = document.getElementById('exploreVideo');
+        if (video) {
+            video.play().catch(e => console.log('Video autoplay blocked:', e));
+        }
+    }, 200);
 
                // Play the video if it exists
     setTimeout(() => {
