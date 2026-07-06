@@ -460,12 +460,17 @@
             .catch(err => console.log('Audio autoplay blocked:', err));
     }
 
-    setTimeout(() => {
-        const video = document.getElementById('exploreVideo');
-        if (video) {
-            video.play().catch(e => console.log('Video autoplay blocked:', e));
-        }
-    }, 200);
+    // Wait for video to load, then play
+    const videoElement = document.getElementById('exploreVideo');
+    if (videoElement) {
+      videoElement.addEventListener('loadeddata', function() {
+        this.play().catch(e => console.log('Video autoplay failed:', e));
+      });
+      // Fallback: try to play after a delay if loadeddata doesn't fire
+      setTimeout(() => {
+        videoElement.play().catch(e => console.log('Video autoplay blocked (fallback):', e));
+      }, 500);
+    }
 
                   // Force video to load and play
     setTimeout(() => {
