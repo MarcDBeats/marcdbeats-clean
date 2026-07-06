@@ -480,6 +480,7 @@
       prevIndex = state.beats.length - 1;
     }
     const beat = state.beats[prevIndex];
+    console.log('prevBeat - playing beat:', beat);  // DEBUG
     renderCard(beat, prevIndex, state.beats);
     
     // Wait for audio to load, then play
@@ -507,6 +508,7 @@
       nextIndex = 0;
     }
     const beat = state.beats[nextIndex];
+    console.log('nextBeat - playing beat:', beat);  // DEBUG
     renderCard(beat, nextIndex, state.beats);
     
     // Wait for audio to load, then play
