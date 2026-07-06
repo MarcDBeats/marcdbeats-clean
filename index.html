@@ -396,7 +396,7 @@
     // =============================================================
     // 🎬 RENDER CARD (Simplified for testing)
     // =============================================================
-       function renderCard(beat, index, queue) {
+         function renderCard(beat, index, queue) {
     const container = document.getElementById('exploreBeatDisplay');
     if (!container) return;
     
@@ -409,26 +409,19 @@
     } else if (hasArtwork) {
       mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
     } else {
-      mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:48px;">🎵</div>`;
+      mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
     }
     
     container.innerHTML = `
-      <div style="width:100%;height:100%;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.4);">
-        <div style="width:100%;height:60%;overflow:hidden;background:var(--bg-card-hover);">
+      <div style="width:100%;height:100%;position:relative;border-radius:16px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+        <div style="width:100%;height:100%;overflow:hidden;background:var(--bg-card-hover);">
           ${mediaHTML}
         </div>
-        <div style="padding:16px 20px;display:flex;flex-direction:column;justify-content:center;flex:1;background:var(--bg-card);">
-          <h2 style="font-size:20px;font-weight:700;margin-bottom:2px;">${beat.title}</h2>
-          <p style="color:var(--text-secondary);font-size:14px;margin-bottom:2px;">${beat.artist}</p>
-          <p style="color:var(--text-muted);font-size:12px;margin-bottom:8px;">${beat.genre}</p>
-          <div style="display:flex;gap:8px;">
-            <button onclick="addToCart(${beat.id})" style="background:var(--gradient-1);border:none;border-radius:20px;padding:8px 16px;color:white;font-size:13px;font-weight:600;cursor:pointer;flex:1;">
-              🛒 Add to Cart
-            </button>
-            <button onclick="handleBuy(${beat.id})" style="background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:20px;padding:8px 16px;color:var(--text-secondary);font-size:13px;cursor:pointer;">
-              PWYW
-            </button>
-          </div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:20px;left:20px;right:20px;z-index:2;pointer-events:none;">
+          <h2 style="font-size:22px;font-weight:700;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.title}</h2>
+          <p style="color:var(--text-secondary);font-size:15px;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.artist}</p>
+          <p style="color:var(--text-muted);font-size:13px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.genre}</p>
         </div>
       </div>
     `;
@@ -436,16 +429,14 @@
     state.playerQueue = queue || state.beats;
     state.currentIndex = index;
     updatePlayer(beat);
-
-           // Auto-play the new beat
-  const audio = document.getElementById('audioPlayer');
-  if (audio && beat.mp3) {
-    audio.play().catch(e => console.log('Auto-play failed:', e));
-    state.isPlaying = true;
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    
+    const audio = document.getElementById('audioPlayer');
+    if (audio && beat.mp3) {
+      audio.play().catch(e => console.log('Auto-play failed:', e));
+      state.isPlaying = true;
+      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    }
   }
-  }
-
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
@@ -1122,6 +1113,12 @@
     showToast('No audio available for this beat', 'fa-exclamation-circle');
     return;
   }
+
+        document.getElementById('playerAddToCart')?.addEventListener('click', () => {
+    if (state.currentBeat) {
+      addToCart(state.currentBeat.id);
+    }
+  });
   
   if (state.isPlaying) {
     audio.pause();
@@ -1586,9 +1583,17 @@
   </button>
 </div>
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-      <button id="playerLike" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-heart"></i></button>
-      <button id="playerCart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-shopping-cart"></i></button>
-    </div>
+  <button id="playerLike" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
+    <i class="fas fa-heart"></i>
+  </button>
+  <button id="playerAddToCart" style="background:none;border:none;color:var(--text-muted);font-size:24px;padding:6px 8px;cursor:pointer;border-radius:50%;font-weight:300;">
+    <i class="fas fa-plus-circle"></i>
+  </button>
+  <button id="playerCart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;position:relative;">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="cart-badge" id="cartBadge" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
+  </button>
+</div>
   </div>
 </div>
 
