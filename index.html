@@ -410,7 +410,7 @@
     if (!container) return;
     
     // Handle video background - SIMPLIFIED WORKING VERSION
-    let video = document.getElementById('exploreVideo');
+        let video = document.getElementById('exploreVideo');
     if (!video) {
       video = document.createElement('video');
       video.id = 'exploreVideo';
@@ -419,7 +419,7 @@
       video.playsInline = true;
       video.autoplay = true;
       video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
-      video.setAttribute('crossorigin', 'anonymous');
+      // Remove crossorigin attribute
       video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;pointer-events:none;';
       document.body.prepend(video);
     }
