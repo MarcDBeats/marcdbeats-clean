@@ -766,6 +766,9 @@
   // =============================================================
   // ⭐ RENDER FEATURED
   // =============================================================
+    // =============================================================
+  // ⭐ RENDER FEATURED (List view - no thumbnails)
+  // =============================================================
   function renderFeatured() {
     const grid = document.getElementById('featuredGrid');
     if (!grid) return;
@@ -780,26 +783,22 @@
       return;
     }
 
-    grid.innerHTML = featured.map(beat => `
-      <div class="featured-card" data-beat-id="${beat.id}" style="position:relative;">
-        <div class="featured-badge">Featured</div>
-        <div class="art">
-          ${hasVideo(beat)
-            ? `<video src="${beat.video}" muted loop playsinline></video>`
-            : `<img src="${beat.artwork}" alt="${beat.title}" />`
-          }
+    // Simple list view
+    grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+      ${featured.map(beat => `
+        <div class="featured-list-item" data-beat-id="${beat.id}" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg-card);border-radius:12px;border:1px solid var(--border-subtle);cursor:pointer;transition:0.2s;">
+          <div>
+            <div style="font-weight:600;">${beat.title}</div>
+            <div style="font-size:13px;color:var(--text-muted);">${beat.artist} · ${beat.genre}</div>
+          </div>
+          <div style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</div>
         </div>
-        <div class="info">
-          <div class="title">${beat.title}</div>
-          <div class="artist">${beat.artist}</div>
-          <div class="price">${formatPrice(beat.price)}</div>
-        </div>
-      </div>
-    `).join('');
+      `).join('')}
+    </div>`;
 
-    grid.querySelectorAll('.featured-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const beatId = parseInt(card.dataset.beatId);
+    grid.querySelectorAll('.featured-list-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const beatId = parseInt(item.dataset.beatId);
         const beat = getBeat(beatId);
         if (beat) {
           closeAllViews();
@@ -808,8 +807,6 @@
         }
       });
     });
-
-    document.getElementById('featuredTabCount').textContent = featured.length;
   }
 
   // =============================================================
