@@ -547,7 +547,7 @@
     if (artwork) {
       const hasVideoFile = hasVideo(beat);
       if (hasVideoFile) {
-artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>`;
+artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>`;
       } else if (beat.artwork) {
         artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
       } else {
