@@ -150,21 +150,27 @@ const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
   // =============================================================
   // 🔐 AUTH FUNCTIONS
   // =============================================================
-  async function signUp(email, password) {
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      state.user = data.user;
-      state.isGuest = false;
-      await loadUserData();
-      updateUI();
-      showToast('Account created! Welcome.', 'fa-user-check');
-      return true;
-    } catch (error) {
-      showToast(error.message, 'fa-exclamation-circle');
-      return false;
-    }
+  async function signUp(email, password, username) {
+  try {
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: { username: username }
+      }
+    });
+    if (error) throw error;
+    state.user = data.user;
+    state.isGuest = false;
+    await loadUserData();
+    updateUI();
+    showToast('Welcome, ' + username + '!', 'fa-user-check');
+    return true;
+  } catch (error) {
+    showToast(error.message, 'fa-exclamation-circle');
+    return false;
   }
+}
 
   async function signIn(email, password) {
     try {
@@ -721,57 +727,79 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
   // 🔐 AUTH MODAL
   // =============================================================
   function showAuthModal() {
-    const modalBox = document.getElementById('modalBox');
-    if (!modalBox) return;
-    
+  const modalBox = document.getElementById('modalBox');
+  if (!modalBox) return;
+  
+  let isLogin = true;
+  
+  function renderAuthForm() {
     modalBox.innerHTML = `
-      <h2 id="authTitle">Welcome</h2>
-      <p class="sub" id="authSub">Sign in or create an account</p>
+      <h2 id="authTitle">${isLogin ? 'Welcome Back' : 'Join MarcDBeats'}</h2>
+      <p class="sub" id="authSub">${isLogin ? 'Sign in to your account' : 'Create your account'}</p>
+
+      ${!isLogin ? `
+        <label>Username</label>
+        <input type="text" id="authUsername" placeholder="Choose a username" />
+      ` : ''}
+
       <label>Email</label>
       <input type="email" id="authEmail" placeholder="artist@email.com" />
+
       <label>Password</label>
-      <input type="password" id="authPassword" placeholder="Enter your password" />
-      <button class="btn-primary" id="authSubmit">Sign In</button>
+      <input type="password" id="authPassword" placeholder="${isLogin ? 'Enter your password' : 'Create a password'}" />
+
+      <button class="btn-primary" id="authSubmit">${isLogin ? 'Sign In' : 'Create Account'}</button>
       <button class="btn-secondary" id="cancelAuth">Cancel</button>
+
       <div class="switch-auth">
-        <span id="authSwitchText">Don't have an account?</span>
-        <a id="authSwitch">Create one</a>
+        <span id="authSwitchText">${isLogin ? "Don't have an account?" : 'Already have an account?'}</span>
+        <a id="authSwitch">${isLogin ? 'Create one' : 'Sign in'}</a>
       </div>
       <div class="terms">By continuing, you agree to our Terms & Policies</div>
     `;
 
-    document.getElementById('modalOverlay').classList.add('active');
-
-    document.getElementById('cancelAuth')?.addEventListener('click', () => {
+    document.getElementById('cancelAuth').addEventListener('click', () => {
       document.getElementById('modalOverlay').classList.remove('active');
     });
 
-    let isLogin = true;
-    document.getElementById('authSwitch')?.addEventListener('click', () => {
+    document.getElementById('authSwitch').addEventListener('click', () => {
       isLogin = !isLogin;
-      document.getElementById('authTitle').textContent = isLogin ? 'Welcome' : 'Create Account';
-      document.getElementById('authSub').textContent = isLogin ? 'Sign in to your account' : 'Create an account';
-      document.getElementById('authSubmit').textContent = isLogin ? 'Sign In' : 'Create Account';
-      document.getElementById('authSwitchText').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
-      document.getElementById('authSwitch').textContent = isLogin ? 'Create one' : 'Sign in';
+      renderAuthForm();
     });
 
-    document.getElementById('authSubmit')?.addEventListener('click', async () => {
+    document.getElementById('authSubmit').addEventListener('click', async () => {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value.trim();
+      
       if (!email || !password) {
         showToast('Please enter email and password', 'fa-exclamation-circle');
         return;
       }
-      let success;
-      if (isLogin) success = await signIn(email, password);
-      else success = await signUp(email, password);
-      if (success) {
-        document.getElementById('modalOverlay').classList.remove('active');
-        updateUI();
+
+      if (!isLogin) {
+        const username = document.getElementById('authUsername')?.value.trim();
+        if (!username || username.length < 3) {
+          showToast('Username must be at least 3 characters', 'fa-exclamation-circle');
+          return;
+        }
+        const success = await signUp(email, password, username);
+        if (success) {
+          document.getElementById('modalOverlay').classList.remove('active');
+          updateUI();
+        }
+      } else {
+        const success = await signIn(email, password);
+        if (success) {
+          document.getElementById('modalOverlay').classList.remove('active');
+          updateUI();
+        }
       }
     });
   }
+
+  renderAuthForm();
+  document.getElementById('modalOverlay').classList.add('active');
+}
 
   // =============================================================
   // 📀 RENDER PLAYLISTS
@@ -1824,6 +1852,60 @@ button {
 }
 button:active {
   transform: scale(0.95) !important;
+}
+
+/* Modern Auth Modal */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+}
+
+.modal-box {
+  background: rgba(26, 26, 46, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 32px !important;
+  padding: 40px 32px !important;
+  max-width: 420px !important;
+  animation: modalSlideUp 0.4s ease !important;
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-box input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 14px !important;
+  padding: 14px 16px !important;
+  margin-bottom: 12px !important;
+}
+
+.modal-box input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
+}
+
+.modal-box .btn-primary {
+  background: var(--gradient-1) !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  box-shadow: 0 4px 24px rgba(220, 38, 38, 0.25) !important;
+}
+
+.modal-box .btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.35) !important;
+}
+
+.modal-box .btn-secondary {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.modal-box .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
     
   </style>
