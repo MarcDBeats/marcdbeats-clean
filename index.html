@@ -1113,6 +1113,13 @@
   }
 });
 
+      // Auto-advance to next beat when audio ends
+  document.getElementById('audioPlayer')?.addEventListener('ended', () => {
+    state.isPlaying = false;
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    nextBeat();
+  });
+
     // Search
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       const query = document.getElementById('searchInput')?.value;
