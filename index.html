@@ -417,19 +417,19 @@
     
     let mediaHTML = '';
     if (hasVideoFile) {
-  mediaHTML = `<video id="exploreVideo" src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;z-index:10;background:#000;"></video>`;
+  mediaHTML = `<video id="exploreVideo" src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;"></video>`;
 } else if (hasArtwork) {
       mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
     } else {
       mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
     }
     
-    container.innerHTML = `
-      <div style="width:100%;height:100%;position:relative;border-radius:16px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+        container.innerHTML = `
+      <div style="width:100%;height:100%;position:relative;border-radius:16px;overflow:hidden;background:transparent;box-shadow:none;">
                <div style="width:100%;height:100%;overflow:visible;background:var(--bg-card-hover);position:relative;">
           ${mediaHTML}
         </div>
-        <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);pointer-events:none;"></div>
+                <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
         <div style="position:absolute;bottom:20px;left:20px;right:20px;z-index:2;pointer-events:none;">
           <h2 style="font-size:22px;font-weight:700;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.title}</h2>
           <p style="color:var(--text-secondary);font-size:15px;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.artist}</p>
@@ -1671,16 +1671,15 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
     }
 #exploreVideo {
-  display: block !important;
-  position: absolute !important;
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  width: 100vw !important;
+  height: 100vh !important;
   object-fit: cover !important;
-  z-index: 10 !important;
+  z-index: -1 !important;
   background: #000 !important;
-  pointer-events: none !important;  /* 👈 This prevents hover interactions */
+  pointer-events: none !important;
 }
 
 /* Hide all controls */
