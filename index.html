@@ -417,6 +417,7 @@
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
+      video.autoplay = true;  // 👈 ADD THIS
       video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
       video.setAttribute('crossorigin', 'anonymous');
       video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;pointer-events:none;';
@@ -427,7 +428,17 @@
     if (beat.video && beat.video.length > 0) {
       video.src = beat.video;
       video.load();
-      video.play().catch(e => console.log('Video play failed:', e));
+      // Force video to play
+      setTimeout(() => {
+        video.play().then(() => {
+          console.log('✅ Video playing');
+        }).catch(e => {
+          console.log('Video play failed:', e);
+          // Try muted
+          video.muted = true;
+          video.play().catch(err => console.log('Muted video failed:', err));
+        });
+      }, 200);
       video.style.display = 'block';
     } else {
       video.style.display = 'none';
