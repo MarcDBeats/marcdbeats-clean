@@ -462,12 +462,21 @@
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
-      function prevBeat() {
+        function prevBeat() {
     let prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) {
-      prevIndex = state.beats.length - 1; // Loop to end
+      prevIndex = state.beats.length - 1;
     }
-    renderCard(state.beats[prevIndex], prevIndex, state.beats);
+    const beat = state.beats[prevIndex];
+    renderCard(beat, prevIndex, state.beats);
+    
+    // Auto-play the audio
+    const audio = document.getElementById('audioPlayer');
+    if (audio && beat.mp3) {
+      audio.play().catch(e => console.log('Playback failed:', e));
+      state.isPlaying = true;
+      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    }
   }
 
     function nextBeat() {
