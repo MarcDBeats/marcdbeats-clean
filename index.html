@@ -508,15 +508,16 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-    
-    // Play the video
+                 // Force video to play
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
-      if (video) {
-        video.play().catch(e => console.log('Video autoplay blocked:', e));
+      if (video && beat.video) {
+        video.src = beat.video;
+        video.load();
+        video.play().catch(e => console.log('Video play failed:', e));
       }
-    }, 300);
-  }
+    }, 400);
+    
 
     function nextBeat() {
     let nextIndex = state.currentIndex + 1;
@@ -536,15 +537,17 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-    
-    // Play the video
+      
+          // Force video to play
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
-      if (video) {
-        video.play().catch(e => console.log('Video autoplay blocked:', e));
+      if (video && beat.video) {
+        video.src = beat.video;
+        video.load();
+        video.play().catch(e => console.log('Video play failed:', e));
       }
-    }, 300);
-  }
+    }, 400);
+    
 
   function shuffleArray(array) {
     const shuffled = [...array];
