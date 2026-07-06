@@ -467,13 +467,24 @@
         }
     }, 200);
 
-               // Play the video if it exists
+                  // Force video to load and play
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
       if (video) {
-        video.play().catch(e => console.log('Video autoplay blocked:', e));
+        // Set the src again to ensure it's loaded
+        video.src = state.currentBeat.video || beat.video;
+        video.load();
+        video.play().then(() => {
+          console.log('Video playing successfully');
+        }).catch(e => {
+          console.log('Video autoplay blocked:', e);
+          // Show a play button overlay if autoplay fails
+          video.controls = true;
+        });
+      } else {
+        console.log('Video element not found');
       }
-    }, 200);
+    }, 500);
     
   }
   // =============================================================
