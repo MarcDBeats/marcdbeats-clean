@@ -110,6 +110,12 @@
       if (views >= 1000) return `${(views / 1000).toFixed(0)}K`;
       return views.toString();
     }
+      function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return mins + ':' + (secs < 10 ? '0' : '') + secs;
+  }
     function getBeat(id) { return state.beats.find(b => b.id === id); }
     function getPlaylistBeats(playlistId) {
       const playlist = state.playlists.find(p => p.id === playlistId);
@@ -131,6 +137,8 @@
       const firstBeat = playlist.beats[0];
       return firstBeat?.artwork || '/assets/artwork/default-cover.jpg';
     }
+
+    
 
     // =============================================================
     // 🔐 AUTH FUNCTIONS
@@ -388,35 +396,39 @@
     // =============================================================
     // 🎬 RENDER CARD (Simplified for testing)
     // =============================================================
-      function renderCard(beat, index, queue) {
-    const container = document.getElementById('swipeContainer');
+       function renderCard(beat, index, queue) {
+    const container = document.getElementById('exploreBeatDisplay');
     if (!container) return;
     
-    // Check if we have a video or artwork
     const hasVideoFile = beat.video && beat.video.length > 0;
     const hasArtwork = beat.artwork && beat.artwork.length > 0;
     
-    // Build the media HTML
     let mediaHTML = '';
     if (hasVideoFile) {
-      mediaHTML = `<video id="swipeVideo" src="${beat.video}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
+      mediaHTML = `<video src="${beat.video}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
     } else if (hasArtwork) {
       mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
     } else {
-      mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
+      mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:48px;">🎵</div>`;
     }
     
-    // Display the beat
     container.innerHTML = `
-      <div style="width:100%;height:100%;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;background:var(--bg-card);position:relative;">
-        <div style="width:100%;height:70%;overflow:hidden;background:var(--bg-card-hover);">
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+        <div style="width:100%;height:60%;overflow:hidden;background:var(--bg-card-hover);">
           ${mediaHTML}
         </div>
-        <div style="padding:20px;display:flex;flex-direction:column;justify-content:center;flex:1;">
-          <h2 style="font-size:24px;font-weight:700;margin-bottom:4px;">${beat.title}</h2>
-          <p style="color:var(--text-secondary);font-size:16px;margin-bottom:4px;">${beat.artist}</p>
-          <p style="color:var(--text-muted);font-size:14px;">${beat.genre}</p>
-          <p style="color:var(--accent);font-size:22px;font-weight:700;margin-top:8px;">${formatPrice(beat.price)}</p>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;justify-content:center;flex:1;background:var(--bg-card);">
+          <h2 style="font-size:20px;font-weight:700;margin-bottom:2px;">${beat.title}</h2>
+          <p style="color:var(--text-secondary);font-size:14px;margin-bottom:2px;">${beat.artist}</p>
+          <p style="color:var(--text-muted);font-size:12px;margin-bottom:8px;">${beat.genre}</p>
+          <div style="display:flex;gap:8px;">
+            <button onclick="addToCart(${beat.id})" style="background:var(--gradient-1);border:none;border-radius:20px;padding:8px 16px;color:white;font-size:13px;font-weight:600;cursor:pointer;flex:1;">
+              🛒 Add to Cart
+            </button>
+            <button onclick="handleBuy(${beat.id})" style="background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:20px;padding:8px 16px;color:var(--text-secondary);font-size:13px;cursor:pointer;">
+              PWYW
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -488,6 +500,27 @@
     likeBtn.classList.toggle('liked', liked);
   }
 }
+      // Update progress bar
+  const audio = document.getElementById('audioPlayer');
+  const progressSlider = document.getElementById('progressSlider');
+  const timeCurrent = document.getElementById('timeCurrent');
+  const timeTotal = document.getElementById('timeTotal');
+  
+  if (audio && progressSlider) {
+    audio.addEventListener('timeupdate', function() {
+      if (!isNaN(audio.duration)) {
+        const progress = (audio.currentTime / audio.duration) * 100;
+        progressSlider.value = progress;
+        timeCurrent.textContent = formatTime(audio.currentTime);
+        timeTotal.textContent = formatTime(audio.duration);
+      }
+    });
+    
+    progressSlider.addEventListener('input', function() {
+      const seekTime = (this.value / 100) * audio.duration;
+      audio.currentTime = seekTime;
+    });
+  }
 
     // =============================================================
     // 🛒 CART MODAL (Simplified)
@@ -667,9 +700,9 @@
           <button class="cart-btn-track" data-beat-id="${beat.id}">
             <i class="fas fa-shopping-cart"></i>
           </button>
-          <button class="buy-btn-track" data-beat-id="${beat.id}">
-            <i class="fas fa-arrow-up"></i> Buy
-          </button>
+          <button class="buy-btn-track" data-beat-id="${beat.id}" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);padding:2px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
+  PWYW
+</button>
         </div>
       </div>
     `).join('');
@@ -760,7 +793,6 @@
             <div style="font-weight:600;">${beat.title}</div>
             <div style="font-size:13px;color:var(--text-muted);">${beat.artist} · ${beat.genre}</div>
           </div>
-          <div style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</div>
         </div>
       `).join('')}
     </div>`;
@@ -1422,7 +1454,21 @@
       <i class="fas fa-chevron-right"></i>
     </button>
     <!-- Beat Display -->
-    <div id="exploreBeatDisplay" style="width:100%;height:100%;">
+    <div class="discover-view active" id="discoverView">
+  <div class="swipe-container" id="swipeContainer" style="position:relative;height:100%;">
+    <!-- Left Arrow -->
+    <button onclick="prevBeat()" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);z-index:10;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.1);border-radius:50%;width:44px;height:44px;color:white;font-size:18px;cursor:pointer;">
+      ‹
+    </button>
+    <!-- Right Arrow -->
+    <button onclick="nextBeat()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:10;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.1);border-radius:50%;width:44px;height:44px;color:white;font-size:18px;cursor:pointer;">
+      ›
+    </button>
+    <!-- Beat Display -->
+    <div id="exploreBeatDisplay" style="width:100%;height:100%;padding:8px;">
+    </div>
+  </div>
+</div>
       <!-- Dynamic content -->
     </div>
   </div>
