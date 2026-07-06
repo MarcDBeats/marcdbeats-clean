@@ -441,6 +441,7 @@
         state.playerQueue = queue || state.beats;
     state.currentIndex = index;
     state.currentBeat = beat;
+    state.currentBeat.video = beat.video;
     updatePlayer(beat);
 
     // AUTO-PLAY AUDIO AND VIDEO WHEN BEAT CHANGES
