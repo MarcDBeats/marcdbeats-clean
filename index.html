@@ -438,10 +438,15 @@
       </div>
     `;
     
-        state.playerQueue = queue || state.beats;
+    state.playerQueue = queue || state.beats;
     state.currentIndex = index;
     state.currentBeat = beat;
+    state.currentBeat.video = beat.video;
     console.log('renderCard - currentBeat set to:', state.currentBeat);  // DEBUG
+    // Fallback: if video is missing, check if it's in the beat object
+    if (!state.currentBeat.video && beat.video) {
+      state.currentBeat.video = beat.video;
+    }
     updatePlayer(beat);
 
     // AUTO-PLAY AUDIO AND VIDEO WHEN BEAT CHANGES
