@@ -10,90 +10,89 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- Combined Application Script -->
-  <script>
-    console.log('=== MARCDBEATS STARTING ===');
-    
-    // =============================================================
-    // AIRTABLE LOADER
-    // =============================================================
-    console.log('Airtable manual loader initializing...');
-    window.Airtable = function(config) {
-      return {
-        base: function(baseId) {
-          return {
-            table: function(tableName) {
-              return {
-                select: function(options) {
-                  return {
-                    all: function() {
-                      let url = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=100`;
-                      if (options && options.sort) {
-                        options.sort.forEach((sort, i) => {
-                          url += `&sort[${i}][field]=${sort.field}&sort[${i}][direction]=${sort.direction || 'asc'}`;
-                        });
-                      }
-                      return fetch(url, {
-                        headers: { 'Authorization': `Bearer ${config.apiKey}` }
-                      })
-                      .then(res => {
-                        if (!res.ok) throw new Error(`Airtable API error: ${res.status}`);
-                        return res.json();
-                      })
-                      .then(data => data.records);
+<script>
+  console.log('=== MARCDBEATS STARTING ===');
+  
+  // =============================================================
+  // AIRTABLE LOADER
+  // =============================================================
+  console.log('Airtable manual loader initializing...');
+  window.Airtable = function(config) {
+    return {
+      base: function(baseId) {
+        return {
+          table: function(tableName) {
+            return {
+              select: function(options) {
+                return {
+                  all: function() {
+                    let url = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=100`;
+                    if (options && options.sort) {
+                      options.sort.forEach((sort, i) => {
+                        url += `&sort[${i}][field]=${sort.field}&sort[${i}][direction]=${sort.direction || 'asc'}`;
+                      });
                     }
-                  };
-                }
-              };
-            }
-          };
-        }
-      };
+                    return fetch(url, {
+                      headers: { 'Authorization': `Bearer ${config.apiKey}` }
+                    })
+                    .then(res => {
+                      if (!res.ok) throw new Error(`Airtable API error: ${res.status}`);
+                      return res.json();
+                    })
+                    .then(data => data.records);
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
     };
-    console.log('Airtable manual loader ready');
+  };
+  console.log('Airtable manual loader ready');
 
-    // =============================================================
-    // 📦 AIRTABLE CONFIG
-    // =============================================================
-   const AIRTABLE_API_KEY = 'patBKZiLmkE0gKJUw.900d727f261dba00b44ed7196327030a6efd35250f6e8a7c5c8b02df5bb63cef';
-    const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
-    const AIRTABLE_TABLE_NAME = 'Beats';
+  // =============================================================
+  // 📦 AIRTABLE CONFIG
+  // =============================================================
+  const AIRTABLE_API_KEY = 'patBKZiLmkE0gKJUw.900d727f261dba00b44ed7196327030a6efd35250f6e8a7c5c8b02df5bb63cef';
+  const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
+  const AIRTABLE_TABLE_NAME = 'Beats';
 
-    // =============================================================
-    // 📦 SUPABASE CONFIG
-    // =============================================================
-    const SUPABASE_URL = 'https://your-project.supabase.co';
-    const SUPABASE_ANON_KEY = 'your-anon-key';
+  // =============================================================
+  // 📦 SUPABASE CONFIG
+  // =============================================================
+  const SUPABASE_URL = 'https://your-project.supabase.co';
+  const SUPABASE_ANON_KEY = 'your-anon-key';
 
-    // THIS IS THE ONLY supabase VARIABLE IN THE ENTIRE FILE
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('Supabase initialized');
+  // THIS IS THE ONLY supabase VARIABLE IN THE ENTIRE FILE
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('Supabase initialized');
 
-    // =============================================================
-    // 📦 STATE
-    // =============================================================
-    const state = {
-      currentIndex: 0,
-      currentBeat: null,
-      isPlaying: false,
-      user: null,
-      likes: [],
-      purchases: [],
-      cart: [],
-      isGuest: true,
-      onboardingShown: false,
-      beats: [],
-      playlists: [],
-      singles: [],
-      featured: [],
-      loaded: false,
-      playerQueue: []
-    };
+  // =============================================================
+  // 📦 STATE
+  // =============================================================
+  const state = {
+    currentIndex: 0,
+    currentBeat: null,
+    isPlaying: false,
+    user: null,
+    likes: [],
+    purchases: [],
+    cart: [],
+    isGuest: true,
+    onboardingShown: false,
+    beats: [],
+    playlists: [],
+    singles: [],
+    featured: [],
+    loaded: false,
+    playerQueue: []
+  };
 
-    // =============================================================
-    // 🛠️ HELPERS
-    // =============================================================
-    
-      function shuffleArray(array) {
+  // =============================================================
+  // 🛠️ HELPERS
+  // =============================================================
+  function shuffleArray(array) {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -101,335 +100,352 @@
     }
     return shuffled;
   }
-    
-    function showToast(msg, icon = 'fa-info-circle') {
-      const toast = document.getElementById('toast');
-      if (!toast) return;
-      document.getElementById('toastMsg').textContent = msg;
-      toast.querySelector('i').className = `fas ${icon}`;
-      toast.classList.add('show');
-      clearTimeout(window.toastTimer);
-      window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
-    }
 
-    function isLiked(beatId) { return state.likes.includes(beatId); }
-    function isLoggedIn() { return state.user !== null; }
-    function formatPrice(price) { return `$${price.toFixed(2)}`; }
-    function formatViews(views) {
-      if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
-      if (views >= 1000) return `${(views / 1000).toFixed(0)}K`;
-      return views.toString();
-    }
-      function formatTime(seconds) {
+  function showToast(msg, icon = 'fa-info-circle') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    document.getElementById('toastMsg').textContent = msg;
+    toast.querySelector('i').className = `fas ${icon}`;
+    toast.classList.add('show');
+    clearTimeout(window.toastTimer);
+    window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  function isLiked(beatId) { return state.likes.includes(beatId); }
+  function isLoggedIn() { return state.user !== null; }
+  function formatPrice(price) { return `$${price.toFixed(2)}`; }
+  function formatViews(views) {
+    if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
+    if (views >= 1000) return `${(views / 1000).toFixed(0)}K`;
+    return views.toString();
+  }
+  function formatTime(seconds) {
     if (!seconds || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return mins + ':' + (secs < 10 ? '0' : '') + secs;
   }
-    function getBeat(id) { return state.beats.find(b => b.id === id); }
-    function getPlaylistBeats(playlistId) {
-      const playlist = state.playlists.find(p => p.id === playlistId);
-      if (!playlist) return [];
-      return playlist.beats;
-    }
-    function getSingles() { return state.singles; }
-    function getAllBeats() { return state.beats; }
-    function getPlaylist(id) { return state.playlists.find(p => p.id === id); }
-    function getAllPlaylists() { return state.playlists; }
-    function hasVideo(beat) { return beat.video && beat.video.length > 0; }
-    function getBeatMedia(beat) {
-      if (hasVideo(beat)) return beat.video;
-      if (beat.artwork) return beat.artwork;
-      return '/assets/artwork/default-cover.jpg';
-    }
-    function getPlaylistCover(playlist) {
-      if (playlist.cover) return playlist.cover;
-      const firstBeat = playlist.beats[0];
-      return firstBeat?.artwork || '/assets/artwork/default-cover.jpg';
-    }
+  function getBeat(id) { return state.beats.find(b => b.id === id); }
+  function getPlaylistBeats(playlistId) {
+    const playlist = state.playlists.find(p => p.id === playlistId);
+    if (!playlist) return [];
+    return playlist.beats;
+  }
+  function getSingles() { return state.singles; }
+  function getAllBeats() { return state.beats; }
+  function getPlaylist(id) { return state.playlists.find(p => p.id === id); }
+  function getAllPlaylists() { return state.playlists; }
+  function hasVideo(beat) { return beat.video && beat.video.length > 0; }
+  function getBeatMedia(beat) {
+    if (hasVideo(beat)) return beat.video;
+    if (beat.artwork) return beat.artwork;
+    return '/assets/artwork/default-cover.jpg';
+  }
+  function getPlaylistCover(playlist) {
+    if (playlist.cover) return playlist.cover;
+    const firstBeat = playlist.beats[0];
+    return firstBeat?.artwork || '/assets/artwork/default-cover.jpg';
+  }
 
-    
-
-    // =============================================================
-    // 🔐 AUTH FUNCTIONS
-    // =============================================================
-    async function signUp(email, password) {
-      try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        state.user = data.user;
-        state.isGuest = false;
-        await loadUserData();
-        updateUI();
-        showToast('Account created! Welcome.', 'fa-user-check');
-        return true;
-      } catch (error) {
-        showToast(error.message, 'fa-exclamation-circle');
-        return false;
-      }
+  // =============================================================
+  // 🔐 AUTH FUNCTIONS
+  // =============================================================
+  async function signUp(email, password) {
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      state.user = data.user;
+      state.isGuest = false;
+      await loadUserData();
+      updateUI();
+      showToast('Account created! Welcome.', 'fa-user-check');
+      return true;
+    } catch (error) {
+      showToast(error.message, 'fa-exclamation-circle');
+      return false;
     }
+  }
 
-    async function signIn(email, password) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        state.user = data.user;
-        state.isGuest = false;
-        await loadUserData();
-        updateUI();
-        showToast('Welcome back!', 'fa-user-check');
-        return true;
-      } catch (error) {
-        showToast(error.message, 'fa-exclamation-circle');
-        return false;
-      }
+  async function signIn(email, password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      state.user = data.user;
+      state.isGuest = false;
+      await loadUserData();
+      updateUI();
+      showToast('Welcome back!', 'fa-user-check');
+      return true;
+    } catch (error) {
+      showToast(error.message, 'fa-exclamation-circle');
+      return false;
     }
+  }
 
-    async function signOut() {
-      try {
-        await supabase.auth.signOut();
-        state.user = null;
-        state.isGuest = true;
-        state.likes = [];
-        state.purchases = [];
-        updateUI();
-        showToast('Signed out', 'fa-sign-out-alt');
-        closeAllViews();
-      } catch (error) {
-        showToast(error.message, 'fa-exclamation-circle');
-      }
+  async function signOut() {
+    try {
+      await supabase.auth.signOut();
+      state.user = null;
+      state.isGuest = true;
+      state.likes = [];
+      state.purchases = [];
+      updateUI();
+      showToast('Signed out', 'fa-sign-out-alt');
+      closeAllViews();
+    } catch (error) {
+      showToast(error.message, 'fa-exclamation-circle');
     }
+  }
 
-    // =============================================================
-    // 💾 USER DATA
-    // =============================================================
-    async function loadUserData() {
-      if (!state.user) return;
-      try {
-        const { data: likesData, error: likesError } = await supabase
+  // =============================================================
+  // 💾 USER DATA
+  // =============================================================
+  async function loadUserData() {
+    if (!state.user) return;
+    try {
+      const { data: likesData, error: likesError } = await supabase
+        .from('likes')
+        .select('beat_id')
+        .eq('member_id', state.user.id);
+      if (!likesError) state.likes = likesData.map(l => l.beat_id);
+
+      const { data: purchasesData, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('member_id', state.user.id);
+      if (!purchasesError) state.purchases = purchasesData;
+
+      updateUI();
+    } catch (error) {
+      console.warn('Could not load user data:', error);
+    }
+  }
+
+  async function toggleLike(beatId) {
+    if (!isLoggedIn()) {
+      showToast('Please sign in to like beats', 'fa-sign-in-alt');
+      return;
+    }
+    const isLikedNow = isLiked(beatId);
+    try {
+      if (isLikedNow) {
+        const { error } = await supabase
           .from('likes')
-          .select('beat_id')
-          .eq('member_id', state.user.id);
-        if (!likesError) state.likes = likesData.map(l => l.beat_id);
-
-        const { data: purchasesData, error: purchasesError } = await supabase
-          .from('purchases')
-          .select('*')
-          .eq('member_id', state.user.id);
-        if (!purchasesError) state.purchases = purchasesData;
-
-        updateUI();
-      } catch (error) {
-        console.warn('Could not load user data:', error);
-      }
-    }
-
-    async function toggleLike(beatId) {
-      if (!isLoggedIn()) {
-        showToast('Please sign in to like beats', 'fa-sign-in-alt');
-        return;
-      }
-      const isLikedNow = isLiked(beatId);
-      try {
-        if (isLikedNow) {
-          const { error } = await supabase
-            .from('likes')
-            .delete()
-            .eq('member_id', state.user.id)
-            .eq('beat_id', beatId);
-          if (!error) {
-            state.likes = state.likes.filter(id => id !== beatId);
-            showToast('Removed like', 'fa-heart-broken');
+          .delete()
+          .eq('member_id', state.user.id)
+          .eq('beat_id', beatId);
+        if (!error) {
+          state.likes = state.likes.filter(id => id !== beatId);
+          showToast('Removed like', 'fa-heart-broken');
+        }
+      } else {
+        const { error } = await supabase
+          .from('likes')
+          .insert({ member_id: state.user.id, beat_id: beatId });
+        if (!error) {
+          state.likes.push(beatId);
+          const likeBtn = document.getElementById('likeBtn');
+          if (likeBtn) {
+            likeBtn.classList.add('like-animation');
+            setTimeout(() => likeBtn.classList.remove('like-animation'), 500);
           }
-        } else {
-          const { error } = await supabase
-            .from('likes')
-            .insert({ member_id: state.user.id, beat_id: beatId });
-          if (!error) {
-            state.likes.push(beatId);
-            const likeBtn = document.getElementById('likeBtn');
-            if (likeBtn) {
-              likeBtn.classList.add('like-animation');
-              setTimeout(() => likeBtn.classList.remove('like-animation'), 500);
-            }
-            showToast('Liked!', 'fa-heart');
-          }
+          showToast('Liked!', 'fa-heart');
         }
-        updateUI();
-      } catch (error) {
-        showToast(error.message, 'fa-exclamation-circle');
       }
+      updateUI();
+    } catch (error) {
+      showToast(error.message, 'fa-exclamation-circle');
     }
+  }
 
-    // =============================================================
-    // 🛒 CART FUNCTIONS
-    // =============================================================
-    function addToCart(beatId) {
-      const beat = getBeat(beatId);
-      if (!beat) return;
-      if (state.cart.find(b => b.id === beatId)) {
-        showToast('Already in cart', 'fa-exclamation-circle');
-        return;
+  // =============================================================
+  // 🛒 CART FUNCTIONS
+  // =============================================================
+  function addToCart(beatId) {
+    const beat = getBeat(beatId);
+    if (!beat) return;
+    if (state.cart.find(b => b.id === beatId)) {
+      showToast('Already in cart', 'fa-exclamation-circle');
+      return;
+    }
+    state.cart.push(beat);
+    updateCartBadge();
+    showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
+  }
+
+  function removeFromCart(beatId) {
+    state.cart = state.cart.filter(b => b.id !== beatId);
+    updateCartBadge();
+    renderCartModal();
+  }
+
+  function updateCartBadge() {
+    const badge = document.getElementById('cartBadge');
+    if (badge) {
+      badge.textContent = state.cart.length;
+      badge.style.display = state.cart.length > 0 ? 'flex' : 'none';
+    }
+  }
+
+  // =============================================================
+  // 📦 LOAD DATA FROM AIRTABLE
+  // =============================================================
+  async function loadBeatData() {
+    try {
+      let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
+      console.log('Fetching from Airtable:', url);
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Airtable API error: ${response.status} - ${response.statusText}`);
       }
-      state.cart.push(beat);
-      updateCartBadge();
-      showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
-    }
 
-    function removeFromCart(beatId) {
-      state.cart = state.cart.filter(b => b.id !== beatId);
-      updateCartBadge();
-      renderCartModal();
-    }
+      const data = await response.json();
+      console.log('Airtable response:', data);
 
-    function updateCartBadge() {
-      const badge = document.getElementById('cartBadge');
-      if (badge) {
-        badge.textContent = state.cart.length;
-        badge.style.display = state.cart.length > 0 ? 'flex' : 'none';
-      }
-    }
-
-    // =============================================================
-    // 📦 LOAD DATA FROM AIRTABLE
-    // =============================================================
-    async function loadBeatData() {
-      try {
-        let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
-        console.log('Fetching from Airtable:', url);
-
-        const response = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Airtable API error: ${response.status} - ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Airtable response:', data);
-
-        if (!data.records || data.records.length === 0) {
-          console.warn('No records found in Airtable');
-          state.beats = [];
-          state.loaded = true;
-          renderDiscover(0);
-          renderFeatured();
-          renderPlaylists();
-          renderSingles();
-          updateUI();
-          showToast('No beats found in Airtable', 'fa-exclamation-circle');
-          return;
-        }
-
-        state.beats = data.records.map(record => ({
-          id: parseInt(record.id, 36),
-          title: record.fields['Beat Name'] || 'Untitled',
-          artist: record.fields['Artist'] || 'Unknown',
-          genre: record.fields['Genre'] || '',
-          price: record.fields['Price'] || 0,
-          bpm: record.fields['BPM'] || '',
-          artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
-          video: record.fields['Video'] || '',
-          mp3: record.fields['MP3'] || '',
-          views: 0,
-          socialLikes: 0,
-          tags: record.fields['Tags'] || [],
-          duration: '',
-          releaseDate: '',
-          playlist: record.fields['Playlist'] || '',
-          isSingle: record.fields['Is Single'] || false,
-          trackNumber: record.fields['Track Number'] || 999,
-          featured: record.fields['Featured'] || false,
-          tikTok: record.fields['Tik Tok'] || '',
-          instagram: record.fields['Instagram'] || '',
-          searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
-        }));
-
-                // Shuffle beats for random order
-        state.beats = shuffleArray(state.beats);
-        state.featured = state.beats.filter(b => b.featured === true);
-        state.singles = state.beats.filter(beat => beat.isSingle === true);
-
-        const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
-        state.playlists = playlistIds.map(id => ({
-          id: id,
-          name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
-        }));
-
+      if (!data.records || data.records.length === 0) {
+        console.warn('No records found in Airtable');
+        state.beats = [];
         state.loaded = true;
-
         renderDiscover(0);
         renderFeatured();
         renderPlaylists();
         renderSingles();
         updateUI();
-
-        console.log(`Loaded ${state.beats.length} beats from Airtable`);
-        console.log(`${state.playlists.length} playlists`);
-        console.log(`${state.singles.length} singles`);
-        console.log(`${state.featured.length} featured`);
-        showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
-      } catch (error) {
-        console.error('Failed to load data from Airtable:', error);
-        showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
-        state.loaded = true;
-      }
-    }
-
-    // =============================================================
-    // 🔍 SEARCH
-    // =============================================================
-    function searchBeats(query) {
-      if (!query || query.trim().length < 2) {
-        renderDiscover(0);
+        showToast('No beats found in Airtable', 'fa-exclamation-circle');
         return;
       }
-      const q = query.toLowerCase().trim();
-      const results = state.beats.filter(beat =>
-        beat.title.toLowerCase().includes(q) ||
-        beat.artist.toLowerCase().includes(q) ||
-        beat.genre.toLowerCase().includes(q) ||
-        beat.searchKeywords.toLowerCase().includes(q)
-      );
-      if (results.length === 0) {
-        showToast('No beats found', 'fa-search');
-        return;
-      }
-      const container = document.getElementById('exploreBeatDisplay');
-      if (!container) return;
-      container.querySelectorAll('.swipe-card').forEach(c => c.remove());
-      const beat = results[0];
-      state.currentBeat = beat;
-      renderCard(beat, 0, results);
-    }
 
-    // =============================================================
-    // 🎬 RENDER CARD (Simplified for testing)
-    // =============================================================
-         function renderCard(beat, index, queue) {
+      state.beats = data.records.map(record => ({
+        id: parseInt(record.id, 36),
+        title: record.fields['Beat Name'] || 'Untitled',
+        artist: record.fields['Artist'] || 'Unknown',
+        genre: record.fields['Genre'] || '',
+        price: record.fields['Price'] || 0,
+        bpm: record.fields['BPM'] || '',
+        artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
+        video: record.fields['Video'] || '',
+        mp3: record.fields['MP3'] || '',
+        views: 0,
+        socialLikes: 0,
+        tags: record.fields['Tags'] || [],
+        duration: '',
+        releaseDate: '',
+        playlist: record.fields['Playlist'] || '',
+        isSingle: record.fields['Is Single'] || false,
+        trackNumber: record.fields['Track Number'] || 999,
+        featured: record.fields['Featured'] || false,
+        tikTok: record.fields['Tik Tok'] || '',
+        instagram: record.fields['Instagram'] || '',
+        searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
+      }));
+
+      // Shuffle beats for random order
+      state.beats = shuffleArray(state.beats);
+      state.featured = state.beats.filter(b => b.featured === true);
+      state.singles = state.beats.filter(beat => beat.isSingle === true);
+
+      const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
+      state.playlists = playlistIds.map(id => ({
+        id: id,
+        name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
+      }));
+
+      state.loaded = true;
+
+      renderDiscover(0);
+      renderFeatured();
+      renderPlaylists();
+      renderSingles();
+      updateUI();
+
+      console.log(`Loaded ${state.beats.length} beats from Airtable`);
+      console.log(`${state.playlists.length} playlists`);
+      console.log(`${state.singles.length} singles`);
+      console.log(`${state.featured.length} featured`);
+      showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
+    } catch (error) {
+      console.error('Failed to load data from Airtable:', error);
+      showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
+      state.loaded = true;
+    }
+  }
+
+  // =============================================================
+  // 🔍 SEARCH
+  // =============================================================
+  function searchBeats(query) {
+    if (!query || query.trim().length < 2) {
+      renderDiscover(0);
+      return;
+    }
+    const q = query.toLowerCase().trim();
+    const results = state.beats.filter(beat =>
+      beat.title.toLowerCase().includes(q) ||
+      beat.artist.toLowerCase().includes(q) ||
+      beat.genre.toLowerCase().includes(q) ||
+      beat.searchKeywords.toLowerCase().includes(q)
+    );
+    if (results.length === 0) {
+      showToast('No beats found', 'fa-search');
+      return;
+    }
+    const container = document.getElementById('exploreBeatDisplay');
+    if (!container) return;
+    container.querySelectorAll('.swipe-card').forEach(c => c.remove());
+    const beat = results[0];
+    state.currentBeat = beat;
+    renderCard(beat, 0, results);
+  }
+
+  // =============================================================
+  // 🎬 RENDER CARD (SINGLE VERSION - FIXED)
+  // =============================================================
+  function renderCard(beat, index, queue) {
     const container = document.getElementById('exploreBeatDisplay');
     if (!container) return;
     
-    const hasVideoFile = beat.video && beat.video.length > 0;
-    const hasArtwork = beat.artwork && beat.artwork.length > 0;
+    // Handle video background - create once, reuse
+    let video = document.getElementById('exploreVideo');
+    if (!video) {
+      video = document.createElement('video');
+      video.id = 'exploreVideo';
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+      video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;pointer-events:none;';
+      document.body.prepend(video);
+    }
     
+    // Update video source if available
+    if (beat.video && beat.video.length > 0) {
+      video.src = beat.video;
+      video.load();
+      video.play().catch(e => console.log('Video play failed:', e));
+      video.style.display = 'block';
+    } else {
+      video.style.display = 'none';
+    }
+    
+    const hasArtwork = beat.artwork && beat.artwork.length > 0;
     let mediaHTML = '';
-    if (hasVideoFile) {
-  mediaHTML = `<video id="exploreVideo" src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;"></video>`;
-} else if (hasArtwork) {
+    if (hasArtwork) {
       mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
     } else {
       mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
     }
     
-        container.innerHTML = `
+    container.innerHTML = `
       <div style="width:100%;height:100%;position:relative;border-radius:16px;overflow:hidden;background:transparent;box-shadow:none;">
-               <div style="width:100%;height:100%;overflow:visible;background:var(--bg-card-hover);position:relative;">
+        <div style="width:100%;height:100%;overflow:visible;background:var(--bg-card-hover);position:relative;">
           ${mediaHTML}
         </div>
-                <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
         <div style="position:absolute;bottom:20px;left:20px;right:20px;z-index:2;pointer-events:none;">
           <h2 style="font-size:22px;font-weight:700;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.title}</h2>
           <p style="color:var(--text-secondary);font-size:15px;margin-bottom:2px;text-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:auto;">${beat.artist}</p>
@@ -442,63 +458,15 @@
     state.currentIndex = index;
     state.currentBeat = beat;
     state.currentBeat.video = beat.video;
-    console.log('renderCard - currentBeat set to:', state.currentBeat);  // DEBUG
-    // Fallback: if video is missing, check if it's in the beat object
-    if (!state.currentBeat.video && beat.video) {
-      state.currentBeat.video = beat.video;
-    }
     updatePlayer(beat);
-
-    // AUTO-PLAY AUDIO AND VIDEO WHEN BEAT CHANGES
+    
+    // Auto-play audio
     const audio = document.getElementById('audioPlayer');
     if (audio && beat.mp3) {
-        audio.play()
-            .then(() => {
-                state.isPlaying = true;
-                document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-            })
-            .catch(err => console.log('Audio autoplay blocked:', err));
+      audio.play().catch(err => console.log('Audio autoplay blocked:', err));
     }
-
-       // Force video to play (muted) - FINAL FIX
-    setTimeout(() => {
-      const videoEl = document.getElementById('exploreVideo');
-      if (videoEl) {
-        videoEl.muted = true;
-        videoEl.play().then(() => {
-          console.log('✅ Video playing successfully');
-        }).catch(e => {
-          console.log('❌ Video play failed:', e);
-          // If autoplay is blocked, try with user gesture
-          videoEl.controls = true;
-          videoEl.style.cursor = 'pointer';
-          videoEl.addEventListener('click', function() {
-            this.play();
-          });
-        });
-      }
-    }, 300);
-
-                  // Force video to load and play
-    setTimeout(() => {
-      const video = document.getElementById('exploreVideo');
-      if (video) {
-        // Set the src again to ensure it's loaded
-        video.src = state.currentBeat.video || beat.video;
-        video.load();
-        video.play().then(() => {
-          console.log('Video playing successfully');
-        }).catch(e => {
-          console.log('Video autoplay blocked:', e);
-          // Show a play button overlay if autoplay fails
-          video.controls = true;
-        });
-      } else {
-        console.log('Video element not found');
-      }
-    }, 500);
-    
   }
+
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
@@ -508,7 +476,6 @@
       prevIndex = state.beats.length - 1;
     }
     const beat = state.beats[prevIndex];
-    console.log('prevBeat - playing beat:', beat);
     renderCard(beat, prevIndex, state.beats);
     
     setTimeout(() => {
@@ -519,15 +486,6 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-    
-    setTimeout(() => {
-      const video = document.getElementById('exploreVideo');
-      if (video && beat.video) {
-        video.src = beat.video;
-        video.load();
-        video.play().catch(e => console.log('Video play failed:', e));
-      }
-    }, 400);
   }
 
   function nextBeat() {
@@ -536,7 +494,6 @@
       nextIndex = 0;
     }
     const beat = state.beats[nextIndex];
-    console.log('nextBeat - playing beat:', beat);
     renderCard(beat, nextIndex, state.beats);
     
     setTimeout(() => {
@@ -547,18 +504,9 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-    
-    setTimeout(() => {
-      const video = document.getElementById('exploreVideo');
-      if (video && beat.video) {
-        video.src = beat.video;
-        video.load();
-        video.play().catch(e => console.log('Video play failed:', e));
-      }
-    }, 400);
   }
-    
-      // =============================================================
+
+  // =============================================================
   // 🔄 RENDER DISCOVER (Explore Tab)
   // =============================================================
   function renderDiscover(index) {
@@ -581,71 +529,47 @@
     if (index < 0) index = beats.length - 1;
     renderCard(beats[index], index, beats);
   }
-    // =============================================================
-    // 🎵 PLAYER
-    // =============================================================
-        function updatePlayer(beat) {
-      if (!beat) return;
-      
-      // Update title and artist
-      const titleEl = document.getElementById('playerTitle');
-      const artistEl = document.getElementById('playerArtist');
-      if (titleEl) titleEl.textContent = beat.title;
-      if (artistEl) artistEl.textContent = beat.artist;
-      
-      // Update artwork
-      const artwork = document.getElementById('playerArtwork');
-      if (artwork) {
-        const hasVideoFile = hasVideo(beat);
-        if (hasVideoFile) {
-         artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="pointer-events:none;"></video>`;
-        } else if (beat.artwork) {
-          artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" />`;
-        } else {
-          artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
-        }
-      }
-      
-      // Load the audio (but don't play it)
-      const audio = document.getElementById('audioPlayer');
-      if (audio && beat.mp3) {
-        audio.src = beat.mp3;
-        audio.load();
-      }
-      
-      // Update like button
-      const liked = isLiked(beat.id);
-      const likeBtn = document.getElementById('playerLike');
-      if (likeBtn) {
-        likeBtn.classList.toggle('liked', liked);
+
+  // =============================================================
+  // 🎵 PLAYER
+  // =============================================================
+  function updatePlayer(beat) {
+    if (!beat) return;
+    
+    const titleEl = document.getElementById('playerTitle');
+    const artistEl = document.getElementById('playerArtist');
+    if (titleEl) titleEl.textContent = beat.title;
+    if (artistEl) artistEl.textContent = beat.artist;
+    
+    const artwork = document.getElementById('playerArtwork');
+    if (artwork) {
+      const hasVideoFile = hasVideo(beat);
+      if (hasVideoFile) {
+        artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>`;
+      } else if (beat.artwork) {
+        artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+      } else {
+        artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
       }
     }
-      // Update progress bar
-  const audio = document.getElementById('audioPlayer');
-  const progressSlider = document.getElementById('progressSlider');
-  const timeCurrent = document.getElementById('timeCurrent');
-  const timeTotal = document.getElementById('timeTotal');
-  
-  if (audio && progressSlider) {
-    audio.addEventListener('timeupdate', function() {
-      if (!isNaN(audio.duration)) {
-        const progress = (audio.currentTime / audio.duration) * 100;
-        progressSlider.value = progress;
-        timeCurrent.textContent = formatTime(audio.currentTime);
-        timeTotal.textContent = formatTime(audio.duration);
-      }
-    });
     
-    progressSlider.addEventListener('input', function() {
-      const seekTime = (this.value / 100) * audio.duration;
-      audio.currentTime = seekTime;
-    });
+    const audio = document.getElementById('audioPlayer');
+    if (audio && beat.mp3) {
+      audio.src = beat.mp3;
+      audio.load();
+    }
+    
+    const liked = isLiked(beat.id);
+    const likeBtn = document.getElementById('playerLike');
+    if (likeBtn) {
+      likeBtn.classList.toggle('liked', liked);
+    }
   }
 
-    // =============================================================
-    // 🛒 CART MODAL (Simplified)
-    // =============================================================
-      function renderCartModal() {
+  // =============================================================
+  // 🛒 CART MODAL
+  // =============================================================
+  function renderCartModal() {
     const modalBox = document.getElementById('modalBox');
     if (!modalBox) return;
 
@@ -693,7 +617,6 @@
       <button class="btn-secondary" id="closeCart">Continue Browsing</button>
     `;
 
-    // Update total when prices change
     function updateCartTotal() {
       const inputs = document.querySelectorAll('.cart-price-input');
       let total = 0;
@@ -704,7 +627,6 @@
       document.getElementById('cartTotal').textContent = `$${total.toFixed(2)}`;
     }
 
-    // Remove item from cart
     document.querySelectorAll('.cart-item-remove').forEach(btn => {
       btn.addEventListener('click', () => {
         const beatId = parseInt(btn.dataset.beatId);
@@ -712,7 +634,6 @@
       });
     });
 
-    // Listen for price changes
     document.querySelectorAll('.cart-price-input').forEach(input => {
       input.addEventListener('input', updateCartTotal);
       input.addEventListener('change', function() {
@@ -721,7 +642,6 @@
       });
     });
 
-    // Checkout button
     document.getElementById('checkoutCart')?.addEventListener('click', () => {
       document.getElementById('modalOverlay').classList.remove('active');
       showCartCheckout();
@@ -734,63 +654,69 @@
     document.getElementById('modalOverlay').classList.add('active');
     updateCartTotal();
   }
-    // =============================================================
-    // 🔐 AUTH MODAL
-    // =============================================================
-    function showAuthModal() {
-      const modalBox = document.getElementById('modalBox');
-      if (!modalBox) return;
-      
-      modalBox.innerHTML = `
-        <h2 id="authTitle">Welcome</h2>
-        <p class="sub" id="authSub">Sign in or create an account</p>
-        <label>Email</label>
-        <input type="email" id="authEmail" placeholder="artist@email.com" />
-        <label>Password</label>
-        <input type="password" id="authPassword" placeholder="Enter your password" />
-        <button class="btn-primary" id="authSubmit">Sign In</button>
-        <button class="btn-secondary" id="cancelAuth">Cancel</button>
-        <div class="switch-auth">
-          <span id="authSwitchText">Don't have an account?</span>
-          <a id="authSwitch">Create one</a>
-        </div>
-        <div class="terms">By continuing, you agree to our Terms & Policies</div>
-      `;
 
-      document.getElementById('modalOverlay').classList.add('active');
+  function showCartCheckout() {
+    // This will be implemented later
+    showToast('Checkout coming soon!', 'fa-check');
+  }
 
-      document.getElementById('cancelAuth')?.addEventListener('click', () => {
+  // =============================================================
+  // 🔐 AUTH MODAL
+  // =============================================================
+  function showAuthModal() {
+    const modalBox = document.getElementById('modalBox');
+    if (!modalBox) return;
+    
+    modalBox.innerHTML = `
+      <h2 id="authTitle">Welcome</h2>
+      <p class="sub" id="authSub">Sign in or create an account</p>
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="artist@email.com" />
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="Enter your password" />
+      <button class="btn-primary" id="authSubmit">Sign In</button>
+      <button class="btn-secondary" id="cancelAuth">Cancel</button>
+      <div class="switch-auth">
+        <span id="authSwitchText">Don't have an account?</span>
+        <a id="authSwitch">Create one</a>
+      </div>
+      <div class="terms">By continuing, you agree to our Terms & Policies</div>
+    `;
+
+    document.getElementById('modalOverlay').classList.add('active');
+
+    document.getElementById('cancelAuth')?.addEventListener('click', () => {
+      document.getElementById('modalOverlay').classList.remove('active');
+    });
+
+    let isLogin = true;
+    document.getElementById('authSwitch')?.addEventListener('click', () => {
+      isLogin = !isLogin;
+      document.getElementById('authTitle').textContent = isLogin ? 'Welcome' : 'Create Account';
+      document.getElementById('authSub').textContent = isLogin ? 'Sign in to your account' : 'Create an account';
+      document.getElementById('authSubmit').textContent = isLogin ? 'Sign In' : 'Create Account';
+      document.getElementById('authSwitchText').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
+      document.getElementById('authSwitch').textContent = isLogin ? 'Create one' : 'Sign in';
+    });
+
+    document.getElementById('authSubmit')?.addEventListener('click', async () => {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value.trim();
+      if (!email || !password) {
+        showToast('Please enter email and password', 'fa-exclamation-circle');
+        return;
+      }
+      let success;
+      if (isLogin) success = await signIn(email, password);
+      else success = await signUp(email, password);
+      if (success) {
         document.getElementById('modalOverlay').classList.remove('active');
-      });
+        updateUI();
+      }
+    });
+  }
 
-      let isLogin = true;
-      document.getElementById('authSwitch')?.addEventListener('click', () => {
-        isLogin = !isLogin;
-        document.getElementById('authTitle').textContent = isLogin ? 'Welcome' : 'Create Account';
-        document.getElementById('authSub').textContent = isLogin ? 'Sign in to your account' : 'Create an account';
-        document.getElementById('authSubmit').textContent = isLogin ? 'Sign In' : 'Create Account';
-        document.getElementById('authSwitchText').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
-        document.getElementById('authSwitch').textContent = isLogin ? 'Create one' : 'Sign in';
-      });
-
-      document.getElementById('authSubmit')?.addEventListener('click', async () => {
-        const email = document.getElementById('authEmail').value.trim();
-        const password = document.getElementById('authPassword').value.trim();
-        if (!email || !password) {
-          showToast('Please enter email and password', 'fa-exclamation-circle');
-          return;
-        }
-        let success;
-        if (isLogin) success = await signIn(email, password);
-        else success = await signUp(email, password);
-        if (success) {
-          document.getElementById('modalOverlay').classList.remove('active');
-          updateUI();
-        }
-      });
-    }
-
-      // =============================================================
+  // =============================================================
   // 📀 RENDER PLAYLISTS
   // =============================================================
   function renderPlaylists() {
@@ -860,13 +786,12 @@
             <i class="fas fa-shopping-cart"></i>
           </button>
           <button class="buy-btn-track" data-beat-id="${beat.id}" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);padding:2px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-  PWYW
-</button>
+            PWYW
+          </button>
         </div>
       </div>
     `).join('');
 
-    // Click on track → play it in Discover
     tracklist.querySelectorAll('.track-item').forEach(item => {
       item.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
@@ -880,7 +805,6 @@
       });
     });
 
-    // Like buttons in tracklist
     tracklist.querySelectorAll('.like-btn-track').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -891,7 +815,6 @@
       });
     });
 
-    // Cart buttons in tracklist
     tracklist.querySelectorAll('.cart-btn-track').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -900,7 +823,6 @@
       });
     });
 
-    // Buy buttons in tracklist
     tracklist.querySelectorAll('.buy-btn-track').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -909,25 +831,17 @@
       });
     });
 
-    // Show the detail view
     document.getElementById('playlistDetail').classList.add('active');
-  }
-    
-  // =============================================================
-  // 🎧 RENDER SINGLES
-  // =============================================================
-    // =============================================================
-  // 🎧 RENDER SINGLES (Hidden tab - kept for reference)
-  // =============================================================
-  function renderSingles() {
-    // This function is kept for compatibility but Singles tab is hidden
-    // Do nothing - featured tab now shows singles
   }
 
   // =============================================================
-  // ⭐ RENDER FEATURED
+  // 🎧 RENDER SINGLES (Hidden tab - kept for reference)
   // =============================================================
-    // =============================================================
+  function renderSingles() {
+    // Do nothing - Singles tab is hidden
+  }
+
+  // =============================================================
   // ⭐ RENDER FEATURED (List view - no thumbnails)
   // =============================================================
   function renderFeatured() {
@@ -944,7 +858,6 @@
       return;
     }
 
-    // Simple list view
     grid.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;width:100%;">
       ${featured.map(beat => `
         <div class="featured-list-item" data-beat-id="${beat.id}" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg-card);border-radius:12px;border:1px solid var(--border-subtle);cursor:pointer;transition:0.2s;">
@@ -1084,112 +997,120 @@
 
     document.getElementById('signOutBtn')?.addEventListener('click', signOut);
   }
-    // =============================================================
-    // 🔄 TAB SWITCHING
-    // =============================================================
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-      document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
 
-      document.querySelectorAll('.discover-view, .featured-view, .playlists-view, .singles-view').forEach(v => v.classList.remove('active'));
-      document.getElementById(`${tab}View`)?.classList.add('active');
-
-      if (tab === 'featured') renderFeatured();
-      if (tab === 'playlists') renderPlaylists();
-      if (tab === 'singles') renderSingles();
-    }
-
-    // =============================================================
-    // 🧭 NAVIGATION HELPERS
-    // =============================================================
-    function closeAllViews() {
-      document.getElementById('playlistDetail')?.classList.remove('active');
-      document.getElementById('portalView')?.classList.remove('active');
-      document.getElementById('termsView')?.classList.remove('active');
-      document.getElementById('modalOverlay')?.classList.remove('active');
-    }
-
-    function showPortal() {
-      closeAllViews();
-      document.getElementById('portalView')?.classList.add('active');
-      renderPortal();
-    }
-
-    function showTerms() {
-      closeAllViews();
-      document.getElementById('termsView')?.classList.add('active');
-      renderTerms();
-    }
-
-    // =============================================================
-    // 🔄 UI UPDATE
-    // =============================================================
-    function updateUI() {
-      const likesCount = state.likes.length;
-      const badge = document.getElementById('likesBadge');
-      if (badge) {
-        badge.style.display = likesCount > 0 ? 'block' : 'none';
-      }
-
-      const authBtn = document.getElementById('authNavBtn');
-      if (authBtn) {
-        if (isLoggedIn()) {
-          authBtn.textContent = state.user.email.split('@')[0];
-          authBtn.style.background = 'rgba(255,255,255,0.06)';
-          authBtn.style.color = 'var(--text-secondary)';
-        } else {
-          authBtn.textContent = 'Sign In';
-          authBtn.style.background = 'var(--gradient-1)';
-          authBtn.style.color = '#fff';
-        }
-      }
-
-      updateCartBadge();
-    }
-
-    // =============================================================
-    // 🚀 INIT
-    // =============================================================
-    async function init() {
-      console.log('=== INIT STARTING ===');
-      
-      if (supabase) {
-        try {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            state.user = data.session.user;
-            state.isGuest = false;
-            await loadUserData();
-            updateUI();
-          }
-        } catch (e) {
-          console.warn('Supabase session check failed:', e);
-        }
-      }
-
-      await loadBeatData();
-
-      const overlay = document.getElementById('onboardingOverlay');
-      if (overlay) {
-        overlay.classList.add('active');
-        document.getElementById('onboardingStart')?.addEventListener('click', () => {
-          overlay.classList.remove('active');
-        });
-      }
-
-      console.log('=== INIT COMPLETE ===');
-    }
-
-    // =============================================================
-    // 🧭 NAVIGATION EVENTS
-    // =============================================================
   // =============================================================
-  // 🧭 NAVIGATION EVENTS (Wrapped in DOMContentLoaded)
+  // 🔄 TAB SWITCHING
+  // =============================================================
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
+
+    document.querySelectorAll('.discover-view, .featured-view, .playlists-view, .singles-view').forEach(v => v.classList.remove('active'));
+    document.getElementById(`${tab}View`)?.classList.add('active');
+
+    if (tab === 'featured') renderFeatured();
+    if (tab === 'playlists') renderPlaylists();
+    if (tab === 'singles') renderSingles();
+  }
+
+  // =============================================================
+  // 🧭 NAVIGATION HELPERS
+  // =============================================================
+  function closeAllViews() {
+    document.getElementById('playlistDetail')?.classList.remove('active');
+    document.getElementById('portalView')?.classList.remove('active');
+    document.getElementById('termsView')?.classList.remove('active');
+    document.getElementById('modalOverlay')?.classList.remove('active');
+  }
+
+  function showPortal() {
+    closeAllViews();
+    document.getElementById('portalView')?.classList.add('active');
+    renderPortal();
+  }
+
+  function showTerms() {
+    closeAllViews();
+    document.getElementById('termsView')?.classList.add('active');
+    renderTerms();
+  }
+
+  function renderTerms() {
+    const content = document.getElementById('termsContent');
+    if (!content) return;
+    content.innerHTML = `
+      <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
+        <h3>License Agreement</h3>
+        <p>All beats are licensed, not sold.</p>
+      </div>
+    `;
+  }
+
+  // =============================================================
+  // 🔄 UI UPDATE
+  // =============================================================
+  function updateUI() {
+    const likesCount = state.likes.length;
+    const badge = document.getElementById('likesBadge');
+    if (badge) {
+      badge.style.display = likesCount > 0 ? 'block' : 'none';
+    }
+
+    const authBtn = document.getElementById('authNavBtn');
+    if (authBtn) {
+      if (isLoggedIn()) {
+        authBtn.textContent = state.user.email.split('@')[0];
+        authBtn.style.background = 'rgba(255,255,255,0.06)';
+        authBtn.style.color = 'var(--text-secondary)';
+      } else {
+        authBtn.textContent = 'Sign In';
+        authBtn.style.background = 'var(--gradient-1)';
+        authBtn.style.color = '#fff';
+      }
+    }
+
+    updateCartBadge();
+  }
+
+  // =============================================================
+  // 🚀 INIT
+  // =============================================================
+  async function init() {
+    console.log('=== INIT STARTING ===');
+    
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          state.user = data.session.user;
+          state.isGuest = false;
+          await loadUserData();
+          updateUI();
+        }
+      } catch (e) {
+        console.warn('Supabase session check failed:', e);
+      }
+    }
+
+    await loadBeatData();
+
+    const overlay = document.getElementById('onboardingOverlay');
+    if (overlay) {
+      overlay.classList.add('active');
+      document.getElementById('onboardingStart')?.addEventListener('click', () => {
+        overlay.classList.remove('active');
+      });
+    }
+
+    console.log('=== INIT COMPLETE ===');
+  }
+
+  // =============================================================
+  // 🧭 NAVIGATION EVENTS
   // =============================================================
   document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded - attaching events');
 
-    // Tab navigation
     document.querySelectorAll('.tab-nav button').forEach(btn => {
       btn.addEventListener('click', () => {
         closeAllViews();
@@ -1197,14 +1118,12 @@
       });
     });
 
-    // Portal, Terms, Detail
     document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
     document.getElementById('termsNavBtn')?.addEventListener('click', showTerms);
     document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
     document.getElementById('detailBack')?.addEventListener('click', closeAllViews);
 
-    // Auth button
     document.getElementById('authNavBtn')?.addEventListener('click', () => {
       if (isLoggedIn()) {
         showPortal();
@@ -1213,7 +1132,6 @@
       }
     });
 
-    // Likes button
     document.getElementById('likesNavBtn')?.addEventListener('click', () => {
       if (!isLoggedIn()) {
         showToast('Please sign in to view your likes', 'fa-sign-in-alt');
@@ -1223,10 +1141,8 @@
       showPortal();
     });
 
-    // Cart button
     document.getElementById('cartNavBtn')?.addEventListener('click', renderCartModal);
 
-    // Discover buttons
     document.getElementById('dislikeBtn')?.addEventListener('click', nextBeat);
     document.getElementById('likeBtn')?.addEventListener('click', () => {
       if (state.currentBeat) {
@@ -1245,7 +1161,6 @@
     });
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
-       // Player Play button
     document.getElementById('playerPlay')?.addEventListener('click', () => {
       const audio = document.getElementById('audioPlayer');
       if (!audio || !audio.src) {
@@ -1270,7 +1185,6 @@
       }
     });
 
-    // Player Prev button
     document.getElementById('playerPrev')?.addEventListener('click', function() {
       const prevIndex = state.currentIndex - 1;
       if (prevIndex < 0) {
@@ -1283,7 +1197,6 @@
       }
     });
 
-    // Player Next button
     document.getElementById('playerNext')?.addEventListener('click', function() {
       const nextIndex = state.currentIndex + 1;
       if (nextIndex >= state.beats.length) {
@@ -1296,32 +1209,26 @@
       }
     });
 
-    // Auto-advance to next beat when audio ends
     document.getElementById('audioPlayer')?.addEventListener('ended', () => {
       state.isPlaying = false;
       document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
       nextBeat();
     });
 
-        // Like button (heart)
     document.getElementById('playerLike')?.addEventListener('click', function() {
       if (state.currentBeat) {
         toggleLike(state.currentBeat.id);
       }
     });
 
-    // Add to Cart button (+)
     document.getElementById('playerAddToCart')?.addEventListener('click', function() {
       if (state.currentBeat) {
         addToCart(state.currentBeat.id);
       }
     });
-    
 
-    // Cart button
     document.getElementById('playerCart')?.addEventListener('click', renderCartModal);
 
-    // Search
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       const query = document.getElementById('searchInput')?.value;
       if (query) searchBeats(query);
@@ -1333,7 +1240,6 @@
       }
     });
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (document.getElementById('modalOverlay')?.classList.contains('active')) return;
 
@@ -1366,7 +1272,7 @@
   // =============================================================
   init();
   console.log('MarcDBeats v7 loaded!');
-  </script>
+</script>
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
