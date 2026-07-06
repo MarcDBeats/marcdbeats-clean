@@ -419,22 +419,23 @@
       video.playsInline = true;
       video.autoplay = true;  // 👈 ADD THIS
       video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+       video.setAttribute('crossorigin', 'anonymous');
       video.setAttribute('crossorigin', 'anonymous');
       video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;pointer-events:none;';
       document.body.prepend(video);
     }
     
-    // Update video source if available
+        // Update video source if available
     if (beat.video && beat.video.length > 0) {
-      video.src = beat.video;
+      // Add cache-busting parameter
+      const videoUrl = beat.video + '?t=' + Date.now();
+      video.src = videoUrl;
       video.load();
-      // Force video to play
       setTimeout(() => {
         video.play().then(() => {
           console.log('✅ Video playing');
         }).catch(e => {
           console.log('Video play failed:', e);
-          // Try muted
           video.muted = true;
           video.play().catch(err => console.log('Muted video failed:', err));
         });
@@ -557,7 +558,7 @@
     if (artwork) {
       const hasVideoFile = hasVideo(beat);
       if (hasVideoFile) {
-        artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>`;
+artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlslist="nodownload nofullscreen noremoteplayback" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>`;
       } else if (beat.artwork) {
         artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
       } else {
