@@ -425,6 +425,30 @@
     state.currentIndex = index;
     updatePlayer(beat);
   }
+
+      // =============================================================
+  // 🔄 RENDER DISCOVER (Explore Tab)
+  // =============================================================
+  function renderDiscover(index) {
+    const beats = state.beats;
+    const container = document.getElementById('exploreBeatDisplay');
+    if (!container) return;
+    
+    if (beats.length === 0) {
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);padding:40px;text-align:center;">
+          <i class="fas fa-music" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
+          <h3>No beats found</h3>
+          <p>Add beats to your Airtable to get started.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    if (index >= beats.length) index = 0;
+    if (index < 0) index = beats.length - 1;
+    renderCard(beats[index], index, beats);
+  }
     // =============================================================
     // 🎵 PLAYER
     // =============================================================
