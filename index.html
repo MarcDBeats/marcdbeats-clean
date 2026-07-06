@@ -428,6 +428,7 @@
     
     state.playerQueue = queue || state.beats;
     state.currentIndex = index;
+           state.currentBeat = beat;
     updatePlayer(beat);
     
     const audio = document.getElementById('audioPlayer');
