@@ -447,12 +447,41 @@
     // 🎵 PLAYER
     // =============================================================
     function updatePlayer(beat) {
-      if (!beat) return;
-      const titleEl = document.getElementById('playerTitle');
-      const artistEl = document.getElementById('playerArtist');
-      if (titleEl) titleEl.textContent = beat.title;
-      if (artistEl) artistEl.textContent = beat.artist;
+  if (!beat) return;
+  
+  // Update title and artist
+  const titleEl = document.getElementById('playerTitle');
+  const artistEl = document.getElementById('playerArtist');
+  if (titleEl) titleEl.textContent = beat.title;
+  if (artistEl) artistEl.textContent = beat.artist;
+  
+  // Update artwork
+  const artwork = document.getElementById('playerArtwork');
+  if (artwork) {
+    const hasVideoFile = hasVideo(beat);
+    if (hasVideoFile) {
+      artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline></video>`;
+    } else if (beat.artwork) {
+      artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" />`;
+    } else {
+      artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
     }
+  }
+  
+  // Update the audio player
+  const audio = document.getElementById('audioPlayer');
+  if (audio && beat.mp3) {
+    audio.src = beat.mp3;
+    audio.load();
+  }
+  
+  // Update like button
+  const liked = isLiked(beat.id);
+  const likeBtn = document.getElementById('playerLike');
+  if (likeBtn) {
+    likeBtn.classList.toggle('liked', liked);
+  }
+}
 
     // =============================================================
     // 🛒 CART MODAL (Simplified)
@@ -1061,23 +1090,28 @@
 
     // Player buttons
     document.getElementById('playerPlay')?.addEventListener('click', () => {
-      state.isPlaying = !state.isPlaying;
-      document.getElementById('playerPlay').innerHTML = state.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
-      const title = document.getElementById('playerTitle')?.textContent;
-      showToast(state.isPlaying ? `Playing "${title}"` : 'Paused', state.isPlaying ? 'fa-play' : 'fa-pause');
+  const audio = document.getElementById('audioPlayer');
+  if (!audio || !audio.src) {
+    showToast('No audio available for this beat', 'fa-exclamation-circle');
+    return;
+  }
+  
+  if (state.isPlaying) {
+    audio.pause();
+    state.isPlaying = false;
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    showToast('Paused', 'fa-pause');
+  } else {
+    audio.play().catch(e => {
+      console.warn('Playback failed:', e);
+      showToast('Unable to play audio', 'fa-exclamation-circle');
     });
-    document.getElementById('playerPrev')?.addEventListener('click', prevBeat);
-    document.getElementById('playerNext')?.addEventListener('click', nextBeat);
-    document.getElementById('playerLike')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        toggleLike(state.currentBeat.id);
-      }
-    });
-    document.getElementById('playerCart')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        addToCart(state.currentBeat.id);
-      }
-    });
+    state.isPlaying = true;
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    const title = document.getElementById('playerTitle')?.textContent;
+    showToast(`Playing "${title}"`, 'fa-play');
+  }
+});
 
     // Search
     document.getElementById('searchBtn')?.addEventListener('click', () => {
@@ -1451,6 +1485,8 @@
   </div>
 
   <div class="spotify-player" id="spotifyPlayer">
+    <!-- Audio element for MP3 playback -->
+    <audio id="audioPlayer" style="display:none;"></audio>
     <div class="player-left">
       <div class="player-artwork" id="playerArtwork">
         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>
