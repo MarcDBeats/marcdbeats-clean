@@ -577,10 +577,36 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
         timeTotal.textContent = formatTime(audio.duration);
       });
 
-      // Allow clicking/dragging on the progress bar to seek
+            // Allow clicking/dragging on the progress bar to seek
+      let isDragging = false;
+      
+      progressSlider.addEventListener('pointerdown', function() {
+        isDragging = true;
+      });
+      
+      progressSlider.addEventListener('pointerup', function() {
+        isDragging = false;
+        if (!isNaN(audio.duration) && audio.duration > 0) {
+          const seekTime = (parseFloat(this.value) / 100) * audio.duration;
+          audio.currentTime = seekTime;
+        }
+      });
+      
+      // Also allow clicking on the progress bar track (not just dragging)
+      progressSlider.addEventListener('change', function() {
+        if (!isNaN(audio.duration) && audio.duration > 0) {
+          const seekTime = (parseFloat(this.value) / 100) * audio.duration;
+          audio.currentTime = seekTime;
+        }
+      });
+      
+      // Update the visual position while dragging, but don't seek
       progressSlider.addEventListener('input', function() {
-        const seekTime = (this.value / 100) * audio.duration;
-        audio.currentTime = seekTime;
+        // Update the time display to show where you're dragging to
+        if (!isNaN(audio.duration) && audio.duration > 0) {
+          const seekTime = (parseFloat(this.value) / 100) * audio.duration;
+          timeCurrent.textContent = formatTime(seekTime);
+        }
       });
             // Fallback: Update progress bar every second even if timeupdate doesn't fire
       if (window.progressInterval) {
