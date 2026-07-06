@@ -605,6 +605,88 @@
   }
 
   // =============================================================
+  // 📋 PLAYLIST DETAIL (Tracklist View)
+  // =============================================================
+  function showPlaylistDetail(playlistId) {
+    const playlist = getPlaylist(playlistId);
+    if (!playlist) return;
+
+    const beats = playlist.beats;
+    document.getElementById('detailTitle').textContent = playlist.name;
+    document.getElementById('detailCount').textContent = `${beats.length} beats`;
+
+    const tracklist = document.getElementById('detailTracklist');
+    if (!tracklist) return;
+
+    tracklist.innerHTML = beats.map((beat, i) => `
+      <div class="track-item" data-beat-id="${beat.id}">
+        <div class="track-number">${i + 1}</div>
+        <div class="track-info">
+          <div class="title">${beat.title}</div>
+          <div class="artist">${beat.artist} · ${beat.genre}</div>
+        </div>
+        <div class="track-actions">
+          <button class="like-btn-track ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+            <i class="fas fa-heart"></i>
+          </button>
+          <button class="cart-btn-track" data-beat-id="${beat.id}">
+            <i class="fas fa-shopping-cart"></i>
+          </button>
+          <button class="buy-btn-track" data-beat-id="${beat.id}">
+            <i class="fas fa-arrow-up"></i> Buy
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    // Click on track → play it in Discover
+    tracklist.querySelectorAll('.track-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const beatId = parseInt(item.dataset.beatId);
+        const beat = getBeat(beatId);
+        if (beat) {
+          closeAllViews();
+          switchTab('discover');
+          renderDiscover(state.beats.indexOf(beat));
+        }
+      });
+    });
+
+    // Like buttons in tracklist
+    tracklist.querySelectorAll('.like-btn-track').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const beatId = parseInt(btn.dataset.beatId);
+        toggleLike(beatId);
+        btn.classList.toggle('liked');
+        updateUI();
+      });
+    });
+
+    // Cart buttons in tracklist
+    tracklist.querySelectorAll('.cart-btn-track').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const beatId = parseInt(btn.dataset.beatId);
+        addToCart(beatId);
+      });
+    });
+
+    // Buy buttons in tracklist
+    tracklist.querySelectorAll('.buy-btn-track').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const beatId = parseInt(btn.dataset.beatId);
+        handleBuy(beatId);
+      });
+    });
+
+    // Show the detail view
+    document.getElementById('playlistDetail').classList.add('active');
+  }
+    
+  // =============================================================
   // 🎧 RENDER SINGLES
   // =============================================================
   function renderSingles() {
