@@ -451,9 +451,10 @@
       }
     }, 200);
     
-        const audio = document.getElementById('audioPlayer');
+            // Load the audio but don't play it yet (will be played by prevBeat/nextBeat)
+    const audio = document.getElementById('audioPlayer');
     if (audio && beat.mp3) {
-      // Load the audio but don't auto-play
+      audio.src = beat.mp3;
       audio.load();
       state.isPlaying = false;
       document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
@@ -462,7 +463,7 @@
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
-         function prevBeat() {
+           function prevBeat() {
     let prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) {
       prevIndex = state.beats.length - 1;
@@ -470,13 +471,17 @@
     const beat = state.beats[prevIndex];
     renderCard(beat, prevIndex, state.beats);
     
-    const audio = document.getElementById('audioPlayer');
-    if (audio && beat.mp3) {
-      audio.play().catch(e => console.log('Playback failed:', e));
-      state.isPlaying = true;
-      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    }
+    // Wait for audio to load, then play
+    setTimeout(() => {
+      const audio = document.getElementById('audioPlayer');
+      if (audio && beat.mp3) {
+        audio.play().catch(e => console.log('Playback failed:', e));
+        state.isPlaying = true;
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+      }
+    }, 300);
     
+    // Play the video
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
       if (video) {
@@ -485,7 +490,7 @@
     }, 300);
   }
 
-  function nextBeat() {
+    function nextBeat() {
     let nextIndex = state.currentIndex + 1;
     if (nextIndex >= state.beats.length) {
       nextIndex = 0;
@@ -493,13 +498,17 @@
     const beat = state.beats[nextIndex];
     renderCard(beat, nextIndex, state.beats);
     
-    const audio = document.getElementById('audioPlayer');
-    if (audio && beat.mp3) {
-      audio.play().catch(e => console.log('Playback failed:', e));
-      state.isPlaying = true;
-      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    }
+    // Wait for audio to load, then play
+    setTimeout(() => {
+      const audio = document.getElementById('audioPlayer');
+      if (audio && beat.mp3) {
+        audio.play().catch(e => console.log('Playback failed:', e));
+        state.isPlaying = true;
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+      }
+    }, 300);
     
+    // Play the video
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
       if (video) {
