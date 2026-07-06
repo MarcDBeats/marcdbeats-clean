@@ -306,7 +306,7 @@
 
         state.beats = data.records.map(record => ({
           id: parseInt(record.id, 36),
-          title: record.fields['Beat name'] || 'Untitled',
+          title: record.fields['Beat Name'] || 'Untitled',
           artist: record.fields['Artist'] || 'Unknown',
           genre: record.fields['Genre'] || '',
           price: record.fields['Price'] || 0,
