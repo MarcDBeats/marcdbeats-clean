@@ -1164,19 +1164,20 @@
       nextBeat();
     });
 
-    // Add to Cart (+) button
-    document.getElementById('playerAddToCart')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        addToCart(state.currentBeat.id);
-      }
-    });
-
-    // Like button
-    document.getElementById('playerLike')?.addEventListener('click', () => {
+        // Like button (heart)
+    document.getElementById('playerLike')?.addEventListener('click', function() {
       if (state.currentBeat) {
         toggleLike(state.currentBeat.id);
       }
     });
+
+    // Add to Cart button (+)
+    document.getElementById('playerAddToCart')?.addEventListener('click', function() {
+      if (state.currentBeat) {
+        addToCart(state.currentBeat.id);
+      }
+    });
+    
 
     // Cart button
     document.getElementById('playerCart')?.addEventListener('click', renderCartModal);
