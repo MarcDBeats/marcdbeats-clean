@@ -1106,68 +1106,70 @@
     });
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
-    // Player buttons
+       // Player Play button
     document.getElementById('playerPlay')?.addEventListener('click', () => {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || !audio.src) {
-    showToast('No audio available for this beat', 'fa-exclamation-circle');
-    return;
-  }
-  
-  if (state.isPlaying) {
-    audio.pause();
-    state.isPlaying = false;
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    showToast('Paused', 'fa-pause');
-  } else {
-    audio.play().catch(e => {
-      console.warn('Playback failed:', e);
-      showToast('Unable to play audio', 'fa-exclamation-circle');
+      const audio = document.getElementById('audioPlayer');
+      if (!audio || !audio.src) {
+        showToast('No audio available for this beat', 'fa-exclamation-circle');
+        return;
+      }
+      
+      if (state.isPlaying) {
+        audio.pause();
+        state.isPlaying = false;
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+        showToast('Paused', 'fa-pause');
+      } else {
+        audio.play().catch(e => {
+          console.warn('Playback failed:', e);
+          showToast('Unable to play audio', 'fa-exclamation-circle');
+        });
+        state.isPlaying = true;
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        const title = document.getElementById('playerTitle')?.textContent;
+        showToast(`Playing "${title}"`, 'fa-play');
+      }
     });
-    state.isPlaying = true;
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    const title = document.getElementById('playerTitle')?.textContent;
-    showToast(`Playing "${title}"`, 'fa-play');
-  }
-});
 
-      // Player Prev/Next buttons
-  document.getElementById('playerPrev')?.addEventListener('click', function() {
-    const prevIndex = state.currentIndex - 1;
-    if (prevIndex < 0) {
-      showToast('First beat', 'fa-info-circle');
-      return;
-    }
-    const beat = state.beats[prevIndex];
-    if (beat) {
-      renderCard(beat, prevIndex, state.beats);
-    }
-  });
+    // Player Prev button
+    document.getElementById('playerPrev')?.addEventListener('click', function() {
+      const prevIndex = state.currentIndex - 1;
+      if (prevIndex < 0) {
+        showToast('First beat', 'fa-info-circle');
+        return;
+      }
+      const beat = state.beats[prevIndex];
+      if (beat) {
+        renderCard(beat, prevIndex, state.beats);
+      }
+    });
 
-  document.getElementById('playerNext')?.addEventListener('click', function() {
-    const nextIndex = state.currentIndex + 1;
-    if (nextIndex >= state.beats.length) {
-      showToast('All beats viewed', 'fa-check-circle');
-      return;
-    }
-    const beat = state.beats[nextIndex];
-    if (beat) {
-      renderCard(beat, nextIndex, state.beats);
-    }
-  });
+    // Player Next button
+    document.getElementById('playerNext')?.addEventListener('click', function() {
+      const nextIndex = state.currentIndex + 1;
+      if (nextIndex >= state.beats.length) {
+        showToast('All beats viewed', 'fa-check-circle');
+        return;
+      }
+      const beat = state.beats[nextIndex];
+      if (beat) {
+        renderCard(beat, nextIndex, state.beats);
+      }
+    });
 
-      document.getElementById('playerAddToCart')?.addEventListener('click', () => {
-    if (state.currentBeat) {
-      addToCart(state.currentBeat.id);
-    }
-  });
-    
-      // Auto-advance to next beat when audio ends
-  document.getElementById('audioPlayer')?.addEventListener('ended', () => {
-    state.isPlaying = false;
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    nextBeat();
-  });
+    // Auto-advance to next beat when audio ends
+    document.getElementById('audioPlayer')?.addEventListener('ended', () => {
+      state.isPlaying = false;
+      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+      nextBeat();
+    });
+
+    // Add to Cart (+) button
+    document.getElementById('playerAddToCart')?.addEventListener('click', () => {
+      if (state.currentBeat) {
+        addToCart(state.currentBeat.id);
+      }
+    });
 
     // Search
     document.getElementById('searchBtn')?.addEventListener('click', () => {
