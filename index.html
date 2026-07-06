@@ -460,17 +460,18 @@
             .catch(err => console.log('Audio autoplay blocked:', err));
     }
 
-    // Wait for video to load, then play
-    const videoElement = document.getElementById('exploreVideo');
-    if (videoElement) {
-      videoElement.addEventListener('loadeddata', function() {
-        this.play().catch(e => console.log('Video autoplay failed:', e));
-      });
-      // Fallback: try to play after a delay if loadeddata doesn't fire
-      setTimeout(() => {
-        videoElement.play().catch(e => console.log('Video autoplay blocked (fallback):', e));
-      }, 500);
-    }
+    // Play muted video after DOM update
+    setTimeout(() => {
+      const video = document.getElementById('exploreVideo');
+      if (video) {
+        // Make sure it's muted
+        video.muted = true;
+        // Play the video
+        video.play().catch(e => {
+          console.log('Video play failed:', e);
+        });
+      }
+    }, 100);
 
                   // Force video to load and play
     setTimeout(() => {
