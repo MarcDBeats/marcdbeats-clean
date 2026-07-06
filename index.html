@@ -726,9 +726,28 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
   }
 
   function showCartCheckout() {
-    // This will be implemented later
-    showToast('Checkout coming soon!', 'fa-check');
+  // Check if cart is empty
+  if (state.cart.length === 0) {
+    showToast('Your cart is empty', 'fa-exclamation-circle');
+    return;
   }
+
+  // Check if user is logged in
+  if (!isLoggedIn()) {
+    showToast('Please sign in to checkout', 'fa-sign-in-alt');
+    showAuthModal();
+    return;
+  }
+
+  // Show the first beat in cart with price picker
+  const firstBeat = state.cart[0];
+  
+  // Close cart modal
+  document.getElementById('modalOverlay').classList.remove('active');
+  
+  // Show price picker for the first beat
+  showPricePicker(firstBeat);
+}
 
   // =============================================================
   // 🔐 AUTH MODAL
