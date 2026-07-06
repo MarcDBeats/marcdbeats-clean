@@ -490,16 +490,15 @@
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
-           function prevBeat() {
+  function prevBeat() {
     let prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) {
       prevIndex = state.beats.length - 1;
     }
     const beat = state.beats[prevIndex];
-    console.log('prevBeat - playing beat:', beat);  // DEBUG
+    console.log('prevBeat - playing beat:', beat);
     renderCard(beat, prevIndex, state.beats);
     
-    // Wait for audio to load, then play
     setTimeout(() => {
       const audio = document.getElementById('audioPlayer');
       if (audio && beat.mp3) {
@@ -508,7 +507,7 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-                 // Force video to play
+    
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
       if (video && beat.video) {
@@ -517,18 +516,17 @@
         video.play().catch(e => console.log('Video play failed:', e));
       }
     }, 400);
-    
+  }
 
-    function nextBeat() {
+  function nextBeat() {
     let nextIndex = state.currentIndex + 1;
     if (nextIndex >= state.beats.length) {
       nextIndex = 0;
     }
     const beat = state.beats[nextIndex];
-    console.log('nextBeat - playing beat:', beat);  // DEBUG
+    console.log('nextBeat - playing beat:', beat);
     renderCard(beat, nextIndex, state.beats);
     
-    // Wait for audio to load, then play
     setTimeout(() => {
       const audio = document.getElementById('audioPlayer');
       if (audio && beat.mp3) {
@@ -537,8 +535,7 @@
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     }, 300);
-      
-          // Force video to play
+    
     setTimeout(() => {
       const video = document.getElementById('exploreVideo');
       if (video && beat.video) {
@@ -547,15 +544,6 @@
         video.play().catch(e => console.log('Video play failed:', e));
       }
     }, 400);
-    
-
-  function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
   }
     
       // =============================================================
