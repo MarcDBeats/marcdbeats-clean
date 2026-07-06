@@ -377,7 +377,7 @@
         showToast('No beats found', 'fa-search');
         return;
       }
-      const container = document.getElementById('swipeContainer');
+      const container = document.getElementById('exploreBeatDisplay');
       if (!container) return;
       container.querySelectorAll('.swipe-card').forEach(c => c.remove());
       const beat = results[0];
@@ -388,61 +388,43 @@
     // =============================================================
     // 🎬 RENDER CARD (Simplified for testing)
     // =============================================================
-    function renderCard(beat, index, queue) {
-      const container = document.getElementById('swipeContainer');
-      if (!container) return;
-      
-      container.innerHTML = `
-        <div style="padding:20px;background:var(--bg-card);border-radius:20px;text-align:center;height:100%;display:flex;flex-direction:column;justify-content:center;">
-          <h2>${beat.title}</h2>
-          <p>${beat.artist}</p>
-          <p>${formatPrice(beat.price)}</p>
-          <p style="color:var(--text-muted);">${beat.genre}</p>
+      function renderCard(beat, index, queue) {
+    const container = document.getElementById('swipeContainer');
+    if (!container) return;
+    
+    // Check if we have a video or artwork
+    const hasVideoFile = beat.video && beat.video.length > 0;
+    const hasArtwork = beat.artwork && beat.artwork.length > 0;
+    
+    // Build the media HTML
+    let mediaHTML = '';
+    if (hasVideoFile) {
+      mediaHTML = `<video id="swipeVideo" src="${beat.video}" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
+    } else if (hasArtwork) {
+      mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+    } else {
+      mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
+    }
+    
+    // Display the beat
+    container.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;background:var(--bg-card);position:relative;">
+        <div style="width:100%;height:70%;overflow:hidden;background:var(--bg-card-hover);">
+          ${mediaHTML}
         </div>
-      `;
-      
-      state.playerQueue = queue || state.beats;
-      state.currentIndex = index;
-      updatePlayer(beat);
-    }
-
-    function nextBeat() {
-      const queue = state.playerQueue;
-      const nextIndex = state.currentIndex + 1;
-      if (nextIndex >= queue.length) {
-        showToast('All beats viewed', 'fa-check-circle');
-        return;
-      }
-      renderCard(queue[nextIndex], nextIndex, queue);
-    }
-
-    function prevBeat() {
-      const queue = state.playerQueue;
-      const prevIndex = state.currentIndex - 1;
-      if (prevIndex < 0) return;
-      renderCard(queue[prevIndex], prevIndex, queue);
-    }
-
-    function renderDiscover(index) {
-      const beats = state.beats;
-      const container = document.getElementById('swipeContainer');
-      if (!container) return;
-      
-      if (beats.length === 0) {
-        container.innerHTML = `
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);padding:40px;text-align:center;">
-            <i class="fas fa-music" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
-            <h3>No beats found</h3>
-            <p>Add beats to your Airtable to get started.</p>
-          </div>
-        `;
-        return;
-      }
-      if (index >= beats.length) index = 0;
-      if (index < 0) index = beats.length - 1;
-      renderCard(beats[index], index, beats);
-    }
-
+        <div style="padding:20px;display:flex;flex-direction:column;justify-content:center;flex:1;">
+          <h2 style="font-size:24px;font-weight:700;margin-bottom:4px;">${beat.title}</h2>
+          <p style="color:var(--text-secondary);font-size:16px;margin-bottom:4px;">${beat.artist}</p>
+          <p style="color:var(--text-muted);font-size:14px;">${beat.genre}</p>
+          <p style="color:var(--accent);font-size:22px;font-weight:700;margin-top:8px;">${formatPrice(beat.price)}</p>
+        </div>
+      </div>
+    `;
+    
+    state.playerQueue = queue || state.beats;
+    state.currentIndex = index;
+    updatePlayer(beat);
+  }
     // =============================================================
     // 🎵 PLAYER
     // =============================================================
@@ -648,7 +630,7 @@
     if (!tracklist) return;
 
     tracklist.innerHTML = beats.map((beat, i) => `
-      <div class="track-item" data-beat-id="${beat.id}">
+      <div class="track-item" data-beat-id="${beat.id}" id="track-${beat.id}">
         <div class="track-number">${i + 1}</div>
         <div class="track-info">
           <div class="title">${beat.title}</div>
@@ -1400,6 +1382,15 @@
     @media (min-width: 1200px) { .app { max-width: 1200px; } .playlist-grid { grid-template-columns: repeat(5, 1fr); } .singles-grid { grid-template-columns: repeat(5, 1fr); } .featured-grid { grid-template-columns: repeat(5, 1fr); } }
     .hidden { display: none !important; }
     .text-accent { color: var(--accent); }
+
+.track-item.playing {
+  background: rgba(220, 38, 38, 0.15);
+  border-left: 3px solid var(--accent);
+}
+.track-item.playing .title {
+  color: var(--accent);
+}
+    
   </style>
 </head>
 <body>
@@ -1430,18 +1421,25 @@
     <button class="active" data-tab="discover">Explore</button>
     <button data-tab="featured">Featured <span class="tab-count" id="featuredTabCount">0</span></button>
     <button data-tab="playlists">Albums <span class="tab-count" id="playlistsTabCount">0</span></button>
-    <button data-tab="singles">Singles <span class="tab-count" id="singlesTabCount">0</span></button>
   </div>
 
   <div class="content-area">
 
     <div class="discover-view active" id="discoverView">
-      <div class="swipe-container" id="swipeContainer">
-        <div class="swipe-indicator like" id="likeIndicator">LIKE</div>
-        <div class="swipe-indicator dislike" id="dislikeIndicator">SKIP</div>
-      </div>
-    <div class="card-actions" id="cardActions" style="display:none;"></div>
+  <div class="swipe-container" id="swipeContainer" style="position:relative;">
+    <!-- Arrow Navigation -->
+    <button onclick="prevBeat()" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:10;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.1);border-radius:50%;width:44px;height:44px;color:white;font-size:20px;cursor:pointer;backdrop-filter:blur(8px);">
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    <button onclick="nextBeat()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:10;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.1);border-radius:50%;width:44px;height:44px;color:white;font-size:20px;cursor:pointer;backdrop-filter:blur(8px);">
+      <i class="fas fa-chevron-right"></i>
+    </button>
+    <!-- Beat Display -->
+    <div id="exploreBeatDisplay" style="width:100%;height:100%;">
+      <!-- Dynamic content -->
     </div>
+  </div>
+</div>
 
     <div class="featured-view" id="featuredView">
       <div class="featured-grid" id="featuredGrid"></div>
@@ -1483,27 +1481,38 @@
   </div>
 
   <div class="spotify-player" id="spotifyPlayer">
-    <!-- Audio element for MP3 playback -->
-    <audio id="audioPlayer" style="display:none;"></audio>
-    <div class="player-left">
-      <div class="player-artwork" id="playerArtwork">
-        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>
+  <audio id="audioPlayer" style="display:none;"></audio>
+  
+  <!-- Progress Bar -->
+  <div style="display:flex;align-items:center;gap:10px;width:100%;padding:0 4px;">
+    <span id="timeCurrent" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
+    <input type="range" id="progressSlider" min="0" max="100" value="0" style="flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;background:var(--text-muted);outline:none;" />
+    <span id="timeTotal" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
+  </div>
+  
+  <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+      <div id="playerArtwork" style="width:44px;height:44px;border-radius:8px;background:#2a2a3a;flex-shrink:0;overflow:hidden;">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;">
+          <i class="fas fa-music"></i>
+        </div>
       </div>
-      <div class="player-info">
-        <div class="player-title" id="playerTitle">Select a beat</div>
-        <div class="player-artist" id="playerArtist">MarcDBeats</div>
+      <div style="min-width:0;flex:1;">
+        <div id="playerTitle" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select a beat</div>
+        <div id="playerArtist" style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MarcDBeats</div>
       </div>
     </div>
-    <div class="player-center">
-      <button id="playerPrev"><i class="fas fa-step-backward"></i></button>
-      <button class="play-btn" id="playerPlay"><i class="fas fa-play"></i></button>
-      <button id="playerNext"><i class="fas fa-step-forward"></i></button>
+    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <button id="playerPrev" style="background:none;border:none;color:var(--text-secondary);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-step-backward"></i></button>
+      <button id="playerPlay" style="background:none;border:none;color:var(--text-primary);font-size:24px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-play"></i></button>
+      <button id="playerNext" style="background:none;border:none;color:var(--text-secondary);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-step-forward"></i></button>
     </div>
-    <div class="player-right">
-      <button class="player-like" id="playerLike"><i class="fas fa-heart"></i></button>
-      <button id="playerCart"><i class="fas fa-shopping-cart"></i></button>
+    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <button id="playerLike" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-heart"></i></button>
+      <button id="playerCart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;"><i class="fas fa-shopping-cart"></i></button>
     </div>
   </div>
+</div>
 
   <div class="toast" id="toast"><i class="fas fa-info-circle"></i> <span id="toastMsg">Ready</span></div>
 
