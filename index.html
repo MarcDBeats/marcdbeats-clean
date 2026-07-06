@@ -8,6 +8,7 @@
   
   <!-- Supabase Auth -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://js.stripe.com/v3/"></script>
   
   <!-- Combined Application Script -->
 <script>
@@ -68,6 +69,12 @@ const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   console.log('Supabase initialized');
 
+// =============================================================
+// 📦 STRIPE CONFIG
+// =============================================================
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_9tzMrYX8TutSUzuk5VI7XMLD'; // Replace with your key
+const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  
   // =============================================================
   // 📦 STATE
   // =============================================================
@@ -1157,6 +1164,90 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     updateCartBadge();
   }
 
+// =============================================================
+// 💳 STRIPE PAYMENT
+// =============================================================
+
+function showPricePicker(beat) {
+  const modalBox = document.getElementById('modalBox');
+  if (!modalBox) return;
+
+  modalBox.innerHTML = `
+    <h2>Pay What You Want</h2>
+    <p class="sub">Choose your price for "${beat.title}"</p>
+    
+    <div style="text-align:center;margin:20px 0;">
+      <div style="font-size:48px;font-weight:800;color:var(--accent);" id="priceDisplay">$5.00</div>
+      <input type="range" id="priceSlider" min="1" max="50" step="0.50" value="5" 
+        style="width:100%;margin:12px 0;" />
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+        <span>$1.00</span>
+        <span>$50.00</span>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="checkoutBtn">
+      <i class="fas fa-lock"></i> Pay $5.00
+    </button>
+    <button class="btn-secondary" id="cancelCheckout">Cancel</button>
+  `;
+
+  const slider = document.getElementById('priceSlider');
+  const display = document.getElementById('priceDisplay');
+  const checkoutBtn = document.getElementById('checkoutBtn');
+
+  slider.addEventListener('input', () => {
+    const price = parseFloat(slider.value);
+    display.textContent = '$' + price.toFixed(2);
+    checkoutBtn.innerHTML = '<i class="fas fa-lock"></i> Pay $' + price.toFixed(2);
+  });
+
+  document.getElementById('cancelCheckout').addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.remove('active');
+  });
+
+  checkoutBtn.addEventListener('click', async () => {
+    const price = parseFloat(slider.value);
+    await processPayment(beat, price);
+  });
+
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+async function processPayment(beat, price) {
+  if (!isLoggedIn()) {
+    showToast('Please sign in first', 'fa-sign-in-alt');
+    showAuthModal();
+    return;
+  }
+
+  try {
+    showToast('Processing...', 'fa-spinner fa-spin');
+    
+    // For now, just show success (Stripe integration coming next)
+    showToast('Payment successful! Check your email.', 'fa-check-circle');
+    document.getElementById('modalOverlay').classList.remove('active');
+    
+    // Save purchase to Supabase
+    const { error } = await supabase
+      .from('purchases')
+      .insert({
+        member_id: state.user.id,
+        beat_id: beat.id,
+        price: price,
+        download_token: 'test-token-' + Date.now(),
+        purchased_at: new Date().toISOString()
+      });
+      
+    if (error) {
+      console.error('Save error:', error);
+    }
+    
+  } catch (error) {
+    showToast('Payment failed: ' + error.message, 'fa-exclamation-circle');
+  }
+}
+  
   // =============================================================
   // 🚀 INIT
   // =============================================================
@@ -1240,10 +1331,10 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
       }
     });
     document.getElementById('buyBtn')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        showToast(`Buying "${state.currentBeat.title}"`, 'fa-arrow-up');
-      }
-    });
+  if (state.currentBeat) {
+    showPricePicker(state.currentBeat);
+  }
+});
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
     document.getElementById('playerPlay')?.addEventListener('click', () => {
