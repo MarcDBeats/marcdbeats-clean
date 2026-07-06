@@ -441,8 +441,16 @@
     state.currentBeat.video = beat.video;
     updatePlayer(beat);
     
-    const audio = document.getElementById('audioPlayer');
+        const audio = document.getElementById('audioPlayer');
     if (audio && beat.mp3) {
+      // Reset progress bar for new beat
+      const progressSlider = document.getElementById('progressSlider');
+      const timeCurrent = document.getElementById('timeCurrent');
+      const timeTotal = document.getElementById('timeTotal');
+      if (progressSlider) progressSlider.value = 0;
+      if (timeCurrent) timeCurrent.textContent = '0:00';
+      if (timeTotal) timeTotal.textContent = '0:00';
+      
       audio.play().catch(err => console.log('Audio autoplay blocked:', err));
     }
   }
@@ -543,6 +551,49 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     const likeBtn = document.getElementById('playerLike');
     if (likeBtn) {
       likeBtn.classList.toggle('liked', liked);
+    }
+        // Set up progress bar tracking for this audio
+    const progressSlider = document.getElementById('progressSlider');
+    const timeCurrent = document.getElementById('timeCurrent');
+    const timeTotal = document.getElementById('timeTotal');
+
+    if (audio && progressSlider) {
+      // Remove old listeners to prevent duplicates
+      audio.removeEventListener('timeupdate', updateProgress);
+      // Add the new listener
+      audio.addEventListener('timeupdate', updateProgress);
+      
+      function updateProgress() {
+        if (!isNaN(audio.duration)) {
+          const progress = (audio.currentTime / audio.duration) * 100;
+          progressSlider.value = progress;
+          timeCurrent.textContent = formatTime(audio.currentTime);
+          timeTotal.textContent = formatTime(audio.duration);
+        }
+      }
+
+      // Update total time once metadata is loaded
+      audio.addEventListener('loadedmetadata', function() {
+        timeTotal.textContent = formatTime(audio.duration);
+      });
+
+      // Allow clicking/dragging on the progress bar to seek
+      progressSlider.addEventListener('input', function() {
+        const seekTime = (this.value / 100) * audio.duration;
+        audio.currentTime = seekTime;
+      });
+            // Fallback: Update progress bar every second even if timeupdate doesn't fire
+      if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+      }
+      window.progressInterval = setInterval(function() {
+        if (audio && !isNaN(audio.duration) && audio.currentTime > 0) {
+          const progress = (audio.currentTime / audio.duration) * 100;
+          progressSlider.value = progress;
+          timeCurrent.textContent = formatTime(audio.currentTime);
+          timeTotal.textContent = formatTime(audio.duration);
+        }
+      }, 500);
     }
   }
 
