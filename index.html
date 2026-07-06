@@ -460,18 +460,24 @@
             .catch(err => console.log('Audio autoplay blocked:', err));
     }
 
-    // Play muted video after DOM update
+       // Force video to play (muted) - FINAL FIX
     setTimeout(() => {
-      const video = document.getElementById('exploreVideo');
-      if (video) {
-        // Make sure it's muted
-        video.muted = true;
-        // Play the video
-        video.play().catch(e => {
-          console.log('Video play failed:', e);
+      const videoEl = document.getElementById('exploreVideo');
+      if (videoEl) {
+        videoEl.muted = true;
+        videoEl.play().then(() => {
+          console.log('✅ Video playing successfully');
+        }).catch(e => {
+          console.log('❌ Video play failed:', e);
+          // If autoplay is blocked, try with user gesture
+          videoEl.controls = true;
+          videoEl.style.cursor = 'pointer';
+          videoEl.addEventListener('click', function() {
+            this.play();
+          });
         });
       }
-    }, 100);
+    }, 300);
 
                   // Force video to load and play
     setTimeout(() => {
