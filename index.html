@@ -563,128 +563,259 @@
       });
     }
 
-    // =============================================================
-    // 👤 PORTAL (Simplified)
-    // =============================================================
-    function renderPortal() {
-      const content = document.getElementById('portalContent');
-      if (!content) return;
+      // =============================================================
+  // 📀 RENDER PLAYLISTS
+  // =============================================================
+  function renderPlaylists() {
+    const grid = document.getElementById('playlistGrid');
+    if (!grid) return;
+    
+    const playlists = state.playlists;
+    if (playlists.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:var(--text-muted);text-align:center;">
+        <i class="fas fa-folder-open" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
+        <h3>No playlists yet</h3>
+        <p>Add playlists to your Airtable.</p>
+      </div>`;
+      return;
+    }
 
-      if (!isLoggedIn()) {
-        content.innerHTML = `
-          <div style="text-align:center;padding:32px;">
-            <h3>Sign in to access your account</h3>
-            <button class="btn-primary" id="portalSignIn" style="margin-top:16px;">Sign In</button>
+    grid.innerHTML = playlists.map(playlist => {
+      const beats = playlist.beats;
+      const cover = getPlaylistCover(playlist);
+      return `
+        <div class="playlist-card" data-playlist-id="${playlist.id}">
+          <div class="cover"><img src="${cover}" alt="${playlist.name}" /></div>
+          <div class="info">
+            <div class="name">${playlist.name}</div>
+            <div class="count">${beats.length} beats</div>
           </div>
-        `;
-        document.getElementById('portalSignIn')?.addEventListener('click', () => {
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('.playlist-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const playlistId = card.dataset.playlistId;
+        showPlaylistDetail(playlistId);
+      });
+    });
+
+    document.getElementById('playlistsTabCount').textContent = playlists.length;
+  }
+
+  // =============================================================
+  // 🎧 RENDER SINGLES
+  // =============================================================
+  function renderSingles() {
+    const grid = document.getElementById('singlesGrid');
+    if (!grid) return;
+    
+    const singles = state.singles;
+    if (singles.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:var(--text-muted);text-align:center;">
+        <i class="fas fa-music" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
+        <h3>No singles yet</h3>
+        <p>Add singles to your Airtable.</p>
+      </div>`;
+      return;
+    }
+
+    grid.innerHTML = singles.map(beat => `
+      <div class="single-card" data-beat-id="${beat.id}">
+        <div class="art">
+          ${hasVideo(beat)
+            ? `<video src="${beat.video}" muted loop playsinline></video>`
+            : `<img src="${beat.artwork}" alt="${beat.title}" />`
+          }
+        </div>
+        <div class="info">
+          <div class="title">${beat.title}</div>
+          <div class="artist">${beat.artist}</div>
+          <div class="price">${formatPrice(beat.price)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.single-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const beatId = parseInt(card.dataset.beatId);
+        const beat = getBeat(beatId);
+        if (beat) {
           closeAllViews();
-          showAuthModal();
-        });
-        return;
-      }
+          switchTab('discover');
+          renderDiscover(state.beats.indexOf(beat));
+        }
+      });
+    });
 
-      const likedBeats = state.likes.map(id => getBeat(id)).filter(Boolean);
-      const purchasedBeats = state.purchases.map(p => ({ ...getBeat(p.beat_id), purchase: p })).filter(b => b.id);
+    document.getElementById('singlesTabCount').textContent = singles.length;
+  }
 
+  // =============================================================
+  // ⭐ RENDER FEATURED
+  // =============================================================
+  function renderFeatured() {
+    const grid = document.getElementById('featuredGrid');
+    if (!grid) return;
+    
+    const featured = state.featured;
+    if (featured.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:var(--text-muted);text-align:center;">
+        <i class="fas fa-star" style="font-size:48px;color:#2a2a3a;margin-bottom:12px;"></i>
+        <h3>No featured beats</h3>
+        <p>Mark beats as featured in Airtable.</p>
+      </div>`;
+      return;
+    }
+
+    grid.innerHTML = featured.map(beat => `
+      <div class="featured-card" data-beat-id="${beat.id}" style="position:relative;">
+        <div class="featured-badge">Featured</div>
+        <div class="art">
+          ${hasVideo(beat)
+            ? `<video src="${beat.video}" muted loop playsinline></video>`
+            : `<img src="${beat.artwork}" alt="${beat.title}" />`
+          }
+        </div>
+        <div class="info">
+          <div class="title">${beat.title}</div>
+          <div class="artist">${beat.artist}</div>
+          <div class="price">${formatPrice(beat.price)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.featured-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const beatId = parseInt(card.dataset.beatId);
+        const beat = getBeat(beatId);
+        if (beat) {
+          closeAllViews();
+          switchTab('discover');
+          renderDiscover(state.beats.indexOf(beat));
+        }
+      });
+    });
+
+    document.getElementById('featuredTabCount').textContent = featured.length;
+  }
+
+  // =============================================================
+  // 👤 PORTAL
+  // =============================================================
+  function renderPortal() {
+    const content = document.getElementById('portalContent');
+    if (!content) return;
+
+    if (!isLoggedIn()) {
       content.innerHTML = `
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
-          <h3>Profile</h3>
-          <p><strong>Email:</strong> ${state.user.email}</p>
-          <button class="btn-secondary" id="signOutBtn" style="margin-top:12px;">Sign Out</button>
-        </div>
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
-          <h3>Likes (${likedBeats.length})</h3>
-          ${likedBeats.length === 0 ? '<p>No likes yet.</p>' : likedBeats.map(beat => `<p>${beat.title}</p>`).join('')}
-        </div>
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;">
-          <h3>Purchases (${purchasedBeats.length})</h3>
-          ${purchasedBeats.length === 0 ? '<p>No purchases yet.</p>' : purchasedBeats.map(({ title, purchase }) => `<p>${title} - ${formatPrice(purchase.price)}</p>`).join('')}
+        <div class="portal-section" style="text-align:center;padding:32px;">
+          <i class="fas fa-user-circle" style="font-size:48px;color:var(--text-muted);margin-bottom:12px;"></i>
+          <h3 style="color:var(--text-primary);">Sign in to access your account</h3>
+          <p style="color:var(--text-muted);margin-bottom:16px;">Like beats, track purchases, and more.</p>
+          <button class="btn-primary" id="portalSignIn" style="width:auto;padding:12px 32px;margin:0 auto;">
+            <i class="fas fa-sign-in-alt"></i> Sign In
+          </button>
         </div>
       `;
-
-      document.getElementById('signOutBtn')?.addEventListener('click', signOut);
+      document.getElementById('portalSignIn')?.addEventListener('click', () => {
+        closeAllViews();
+        showAuthModal();
+      });
+      return;
     }
 
-    // =============================================================
-    // 📀 RENDER PLAYLISTS (Simplified)
-    // =============================================================
-    function renderPlaylists() {
-      const grid = document.getElementById('playlistGrid');
-      if (!grid) return;
-      
-      const playlists = state.playlists;
-      if (playlists.length === 0) {
-        grid.innerHTML = '<p style="color:var(--text-muted);">No playlists yet</p>';
-        return;
-      }
+    const likedBeats = state.likes.map(id => getBeat(id)).filter(Boolean);
+    const purchasedBeats = state.purchases.map(p => ({ ...getBeat(p.beat_id), purchase: p })).filter(b => b.id);
 
-      grid.innerHTML = playlists.map(playlist => `
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:1px solid var(--border-subtle);">
-          <h3>${playlist.name}</h3>
-          <p style="color:var(--text-muted);font-size:14px;">${playlist.beats.length} beats</p>
+    content.innerHTML = `
+      <div class="portal-section">
+        <h3>Profile</h3>
+        <div class="field">
+          <span class="label">Email</span>
+          <span class="value">${state.user.email}</span>
         </div>
-      `).join('');
-    }
-
-    // =============================================================
-    // 🎧 RENDER SINGLES (Simplified)
-    // =============================================================
-    function renderSingles() {
-      const grid = document.getElementById('singlesGrid');
-      if (!grid) return;
-      
-      const singles = state.singles;
-      if (singles.length === 0) {
-        grid.innerHTML = '<p style="color:var(--text-muted);">No singles yet</p>';
-        return;
-      }
-
-      grid.innerHTML = singles.map(beat => `
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:1px solid var(--border-subtle);">
-          <h3>${beat.title}</h3>
-          <p style="color:var(--text-muted);font-size:14px;">${beat.artist}</p>
-          <p style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</p>
+        <div class="field">
+          <span class="label">Password</span>
+          <span class="value">••••••••</span>
+          <button class="edit-btn" id="changePasswordBtn">Change</button>
         </div>
-      `).join('');
-    }
+        <button class="btn-secondary" id="signOutBtn" style="margin-top:12px;">
+          <i class="fas fa-sign-out-alt"></i> Sign Out
+        </button>
+      </div>
 
-    // =============================================================
-    // ⭐ RENDER FEATURED (Simplified)
-    // =============================================================
-    function renderFeatured() {
-      const grid = document.getElementById('featuredGrid');
-      if (!grid) return;
-      
-      const featured = state.featured;
-      if (featured.length === 0) {
-        grid.innerHTML = '<p style="color:var(--text-muted);">No featured beats</p>';
-        return;
-      }
-
-      grid.innerHTML = featured.map(beat => `
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;cursor:pointer;border:2px solid var(--accent);">
-          <h3>${beat.title}</h3>
-          <p style="color:var(--text-muted);font-size:14px;">${beat.artist}</p>
-          <p style="color:var(--accent);font-weight:700;">${formatPrice(beat.price)}</p>
+      <div class="portal-section">
+        <h3>Likes (${likedBeats.length})</h3>
+        <div class="portal-list">
+          ${likedBeats.length === 0 ? '<p style="color:var(--text-muted);font-size:14px;">No likes yet.</p>' :
+            likedBeats.map(beat => `
+              <div class="list-item">
+                <div class="item-info">
+                  <div class="title">${beat.title}</div>
+                  <div class="sub">${beat.artist} · ${formatPrice(beat.price)}</div>
+                </div>
+                <div class="item-actions">
+                  <button class="buy-sm" data-beat-id="${beat.id}">Buy</button>
+                  <button class="remove-sm" data-beat-id="${beat.id}"><i class="fas fa-heart-broken"></i></button>
+                </div>
+              </div>
+            `).join('')
+          }
         </div>
-      `).join('');
-    }
+      </div>
 
-    // =============================================================
-    // ⚖️ TERMS
-    // =============================================================
-    function renderTerms() {
-      const content = document.getElementById('termsContent');
-      if (!content) return;
-      content.innerHTML = `
-        <div style="background:var(--bg-card);border-radius:16px;padding:16px;margin-bottom:16px;">
-          <h3>License Agreement</h3>
-          <p>All beats are licensed, not sold.</p>
+      <div class="portal-section">
+        <h3>Purchases (${purchasedBeats.length})</h3>
+        <div class="portal-list">
+          ${purchasedBeats.length === 0 ? '<p style="color:var(--text-muted);font-size:14px;">No purchases yet.</p>' :
+            purchasedBeats.map(({ id, title, artist, price, purchase }) => `
+              <div class="list-item">
+                <div class="item-info">
+                  <div class="title">${title}</div>
+                  <div class="sub">${artist} · ${formatPrice(purchase.price)} · ${new Date(purchase.purchased_at).toLocaleDateString()}</div>
+                </div>
+                <div class="item-actions">
+                  <button class="download-sm" data-token="${purchase.download_token}"><i class="fas fa-download"></i></button>
+                </div>
+              </div>
+            `).join('')
+          }
         </div>
-      `;
-    }
+      </div>
+    `;
 
+    content.querySelectorAll('.buy-sm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const beatId = parseInt(btn.dataset.beatId);
+        handleBuy(beatId);
+      });
+    });
+
+    content.querySelectorAll('.remove-sm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const beatId = parseInt(btn.dataset.beatId);
+        toggleLike(beatId);
+        renderPortal();
+        updateUI();
+      });
+    });
+
+    content.querySelectorAll('.download-sm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const token = btn.dataset.token;
+        showToast(`Downloading... (token: ${token})`, 'fa-download');
+        console.log(`Download token: ${token}`);
+      });
+    });
+
+    document.getElementById('changePasswordBtn')?.addEventListener('click', () => {
+      showToast('Password reset email sent!', 'fa-envelope');
+    });
+
+    document.getElementById('signOutBtn')?.addEventListener('click', signOut);
+  }
     // =============================================================
     // 🔄 TAB SWITCHING
     // =============================================================
