@@ -418,6 +418,7 @@
       video.loop = true;
       video.playsInline = true;
       video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+      video.setAttribute('crossorigin', 'anonymous');
       video.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:-1;background:#000;pointer-events:none;';
       document.body.prepend(video);
     }
