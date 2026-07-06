@@ -441,24 +441,22 @@
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
-  function prevBeat() {
-    const queue = state.playerQueue;
+    function prevBeat() {
     const prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) {
       showToast('First beat', 'fa-info-circle');
       return;
     }
-    renderCard(queue[prevIndex], prevIndex, queue);
+    renderCard(state.beats[prevIndex], prevIndex, state.beats);
   }
 
-  function nextBeat() {
-    const queue = state.playerQueue;
+    function nextBeat() {
     const nextIndex = state.currentIndex + 1;
-    if (nextIndex >= queue.length) {
+    if (nextIndex >= state.beats.length) {
       showToast('All beats viewed', 'fa-check-circle');
       return;
     }
-    renderCard(queue[nextIndex], nextIndex, queue);
+    renderCard(state.beats[nextIndex], nextIndex, state.beats);
   }
     
       // =============================================================
