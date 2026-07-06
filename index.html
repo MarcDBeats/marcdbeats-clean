@@ -436,6 +436,14 @@
     state.playerQueue = queue || state.beats;
     state.currentIndex = index;
     updatePlayer(beat);
+
+           // Auto-play the new beat
+  const audio = document.getElementById('audioPlayer');
+  if (audio && beat.mp3) {
+    audio.play().catch(e => console.log('Auto-play failed:', e));
+    state.isPlaying = true;
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+  }
   }
 
   // =============================================================
