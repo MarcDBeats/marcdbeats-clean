@@ -1113,12 +1113,6 @@
     showToast('No audio available for this beat', 'fa-exclamation-circle');
     return;
   }
-
-        document.getElementById('playerAddToCart')?.addEventListener('click', () => {
-    if (state.currentBeat) {
-      addToCart(state.currentBeat.id);
-    }
-  });
   
   if (state.isPlaying) {
     audio.pause();
@@ -1159,6 +1153,12 @@
     const beat = state.beats[nextIndex];
     if (beat) {
       renderCard(beat, nextIndex, state.beats);
+    }
+  });
+
+      document.getElementById('playerAddToCart')?.addEventListener('click', () => {
+    if (state.currentBeat) {
+      addToCart(state.currentBeat.id);
     }
   });
     
