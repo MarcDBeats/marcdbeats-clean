@@ -27,7 +27,7 @@
               select: function(options) {
                 return {
                   all: function() {
-                    let url = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=100`;
+                    let url = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=30`;
                     if (options && options.sort) {
                       options.sort.forEach((sort, i) => {
                         url += `&sort[${i}][field]=${sort.field}&sort[${i}][direction]=${sort.direction || 'asc'}`;
@@ -94,6 +94,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     featured: [],
     loaded: false,
     playerQueue: []
+    dataLoaded: false
   };
 
   // =============================================================
@@ -303,92 +304,121 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   // =============================================================
   // 📦 LOAD DATA FROM AIRTABLE
   // =============================================================
-  async function loadBeatData() {
-    try {
-      let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
-      console.log('Fetching from Airtable:', url);
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Airtable API error: ${response.status} - ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Airtable response:', data);
-
-      if (!data.records || data.records.length === 0) {
-        console.warn('No records found in Airtable');
-        state.beats = [];
-        state.loaded = true;
-        renderBeatStore();
-renderBeatTapes();
-renderSamples();
-renderSync();
-        updateUI();
-        showToast('No beats found in Airtable', 'fa-exclamation-circle');
-        return;
-      }
-
-      state.beats = data.records.map(record => ({
-        id: parseInt(record.id, 36),
-        title: record.fields['Beat Name'] || 'Untitled',
-        artist: record.fields['Artist'] || 'Unknown',
-        genre: record.fields['Genre'] || '',
-        price: record.fields['Price'] || 0,
-        bpm: record.fields['BPM'] || '',
-        artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
-        video: record.fields['Video'] || '',
-        mp3: record.fields['MP3'] || '',
-        views: 0,
-        socialLikes: 0,
-        tags: record.fields['Tags'] || [],
-        duration: '',
-        releaseDate: '',
-        playlist: record.fields['Playlist'] || '',
-        isSingle: record.fields['Is Single'] || false,
-        trackNumber: record.fields['Track Number'] || 999,
-        featured: record.fields['Featured'] || false,
-        tikTok: record.fields['Tik Tok'] || '',
-        instagram: record.fields['Instagram'] || '',
-        searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
-      }));
-
-      // Shuffle beats for random order
-      state.beats = shuffleArray(state.beats);
-      state.featured = state.beats.filter(b => b.featured === true);
-      state.singles = state.beats.filter(beat => beat.isSingle === true);
-
-      const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
-      state.playlists = playlistIds.map(id => ({
-        id: id,
-        name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
-      }));
-
-      state.loaded = true;
-
-// These are the new ones - KEEP these
-renderBeatStore();
-renderBeatTapes();
-renderSamples();
-renderSync();
-
-updateUI();
-
-      console.log(`Loaded ${state.beats.length} beats from Airtable`);
-      console.log(`${state.playlists.length} playlists`);
-      console.log(`${state.singles.length} singles`);
-      console.log(`${state.featured.length} featured`);
-      showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
-    } catch (error) {
-      console.error('Failed to load data from Airtable:', error);
-      showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
-      state.loaded = true;
-    }
+  async function loadBeatData(retryCount = 0) {
+  // Check if data is already loaded
+  if (state.dataLoaded && state.beats.length > 0) {
+    console.log('✅ Using cached beat data');
+    renderBeatStore();
+    renderBeatTapes();
+    renderSamples();
+    renderSync();
+    updateUI();
+    return;
   }
+
+  try {
+    // Add delay for retries
+    if (retryCount > 0) {
+      const delay = retryCount * 1500; // 1.5s, 3s, 4.5s, 6s...
+      console.log(`⏳ Retry attempt ${retryCount}, waiting ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    console.log('📡 Fetching from Airtable...');
+    let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
+    console.log('Fetching from Airtable:', url);
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
+    });
+
+    // Handle rate limiting (429)
+    if (response.status === 429) {
+      console.warn('⚠️ Rate limited (429), retrying...');
+      if (retryCount < 5) {
+        return loadBeatData(retryCount + 1);
+      } else {
+        throw new Error('Rate limit exceeded. Please wait a moment and refresh.');
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(`Airtable API error: ${response.status} - ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Airtable data received');
+
+    if (!data.records || data.records.length === 0) {
+      console.warn('No records found in Airtable');
+      state.beats = [];
+      state.loaded = true;
+      state.dataLoaded = true;
+      renderBeatStore();
+      renderBeatTapes();
+      renderSamples();
+      renderSync();
+      updateUI();
+      showToast('No beats found in Airtable', 'fa-exclamation-circle');
+      return;
+    }
+
+    state.beats = data.records.map(record => ({
+      id: parseInt(record.id, 36),
+      title: record.fields['Beat Name'] || 'Untitled',
+      artist: record.fields['Artist'] || 'Unknown',
+      genre: record.fields['Genre'] || '',
+      price: record.fields['Price'] || 0,
+      bpm: record.fields['BPM'] || '',
+      artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
+      video: record.fields['Video'] || '',
+      mp3: record.fields['MP3'] || '',
+      views: 0,
+      socialLikes: 0,
+      tags: record.fields['Tags'] || [],
+      duration: '',
+      releaseDate: '',
+      playlist: record.fields['Playlist'] || '',
+      isSingle: record.fields['Is Single'] || false,
+      trackNumber: record.fields['Track Number'] || 999,
+      featured: record.fields['Featured'] || false,
+      tikTok: record.fields['Tik Tok'] || '',
+      instagram: record.fields['Instagram'] || '',
+      searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
+    }));
+
+    // Shuffle beats for random order
+    state.beats = shuffleArray(state.beats);
+    state.featured = state.beats.filter(b => b.featured === true);
+    state.singles = state.beats.filter(beat => beat.isSingle === true);
+
+    const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
+    state.playlists = playlistIds.map(id => ({
+      id: id,
+      name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
+    }));
+
+    state.loaded = true;
+    state.dataLoaded = true;
+
+    renderBeatStore();
+    renderBeatTapes();
+    renderSamples();
+    renderSync();
+    updateUI();
+
+    console.log(`✅ Loaded ${state.beats.length} beats from Airtable`);
+    console.log(`📀 ${state.playlists.length} playlists`);
+    console.log(`🎵 ${state.singles.length} singles`);
+    console.log(`⭐ ${state.featured.length} featured`);
+    showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
+  } catch (error) {
+    console.error('❌ Failed to load data from Airtable:', error);
+    showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
+    state.loaded = true;
+  }
+}
 
   // =============================================================
   // 🔍 SEARCH
