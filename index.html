@@ -144,6 +144,37 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   function getAllBeats() { return state.beats; }
   function getPlaylist(id) { return state.playlists.find(p => p.id === id); }
   function getAllPlaylists() { return state.playlists; }
+  function getPlaylistSeries() {
+  const seriesMap = {};
+  
+  state.playlists.forEach(playlist => {
+    const seriesName = playlist.series || playlist.name;
+    
+    if (!seriesMap[seriesName]) {
+      seriesMap[seriesName] = [];
+    }
+    seriesMap[seriesName].push(playlist);
+  });
+  
+  Object.keys(seriesMap).forEach(key => {
+    seriesMap[key].sort((a, b) => {
+      return (a.seriesNumber || 999) - (b.seriesNumber || 999);
+    });
+  });
+  
+  const sortedSeries = {};
+  Object.keys(seriesMap)
+    .sort((a, b) => {
+      const minA = Math.min(...seriesMap[a].map(p => p.seriesNumber || 999));
+      const minB = Math.min(...seriesMap[b].map(p => p.seriesNumber || 999));
+      return minA - minB;
+    })
+    .forEach(key => {
+      sortedSeries[key] = seriesMap[key];
+    });
+  
+  return sortedSeries;
+}
   function hasVideo(beat) { return beat.video && beat.video.length > 0; }
   function getBeatMedia(beat) {
     if (hasVideo(beat)) return beat.video;
@@ -985,6 +1016,50 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     document.getElementById('playlistDetail').classList.add('active');
   }
 
+  function showSeriesDetail(seriesName) {
+  const seriesMap = getPlaylistSeries();
+  const playlists = seriesMap[seriesName] || [];
+  
+  if (playlists.length === 0) return;
+  
+  const modalBox = document.getElementById('modalBox');
+  if (!modalBox) return;
+  
+  modalBox.innerHTML = `
+    <h2>${seriesName}</h2>
+    <p class="sub">${playlists.length} beat tapes in this series</p>
+    <div style="display:flex;flex-direction:column;gap:10px;max-height:400px;overflow-y:auto;">
+      ${playlists.map(playlist => `
+        <div class="series-playlist-item" data-playlist-id="${playlist.id}" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:10px;cursor:pointer;transition:0.2s;">
+          <div style="width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;">
+            <img src="${getPlaylistCover(playlist)}" alt="${playlist.name}" style="width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <div style="flex:1;">
+            <div style="font-weight:600;">${playlist.seriesNumber ? `#${playlist.seriesNumber} ` : ''}${playlist.name}</div>
+            <div style="font-size:13px;color:var(--text-muted);">${playlist.beats.length} beats</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:var(--text-muted);"></i>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn-secondary" id="closeSeriesView" style="margin-top:16px;">Close</button>
+  `;
+  
+  document.getElementById('closeSeriesView')?.addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.remove('active');
+  });
+  
+  document.querySelectorAll('.series-playlist-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const playlistId = item.dataset.playlistId;
+      document.getElementById('modalOverlay').classList.remove('active');
+      showPlaylistDetail(playlistId);
+    });
+  });
+  
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
   // =============================================================
   // 🎧 RENDER SINGLES (Hidden tab - kept for reference)
   // =============================================================
@@ -1425,26 +1500,89 @@ function renderBeatTapes() {
     return;
   }
   
-  grid.innerHTML = playlists.map(playlist => {
-    const cover = getPlaylistCover(playlist);
-    return `
-      <div class="playlist-card" data-playlist-id="${playlist.id}">
-        <div class="cover"><img src="${cover}" alt="${playlist.name}" /></div>
-        <div class="info">
-          <div class="name">${playlist.name}</div>
-          <div class="count">${playlist.beats.length} beats</div>
+  const seriesMap = getPlaylistSeries();
+  const seriesNames = Object.keys(seriesMap);
+  
+  if (seriesNames.length <= 1) {
+    grid.innerHTML = `
+      <div class="playlist-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+        ${playlists.map(playlist => {
+          const cover = getPlaylistCover(playlist);
+          return `
+            <div class="playlist-card" data-playlist-id="${playlist.id}">
+              <div class="cover"><img src="${cover}" alt="${playlist.name}" /></div>
+              <div class="info">
+                <div class="name">${playlist.name}</div>
+                <div class="count">${playlist.beats.length} beats</div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+    grid.querySelectorAll('.playlist-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const playlistId = card.dataset.playlistId;
+        showPlaylistDetail(playlistId);
+      });
+    });
+    return;
+  }
+  
+  let html = '';
+  
+  seriesNames.forEach(seriesName => {
+    const seriesPlaylists = seriesMap[seriesName];
+    
+    html += `
+      <div class="playlist-series" style="margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 8px 4px;">
+          <div class="playlist-series-title" style="font-size:18px;font-weight:700;color:var(--text-primary);">
+            ${seriesName}
+          </div>
+          <button class="series-see-all" data-series="${seriesName}" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:12px;">
+            See All →
+          </button>
+        </div>
+        <div class="playlist-series-scroll" style="display:flex;gap:12px;overflow-x:auto;padding:4px 4px 12px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${seriesPlaylists.map(playlist => {
+            const cover = getPlaylistCover(playlist);
+            return `
+              <div class="playlist-card-horizontal" data-playlist-id="${playlist.id}" style="flex:0 0 140px;scroll-snap-align:start;background:var(--bg-card);border-radius:12px;overflow:hidden;border:1px solid var(--border-subtle);cursor:pointer;transition:0.2s;">
+                <div style="width:100%;aspect-ratio:1/1;overflow:hidden;background:var(--bg-card-hover);">
+                  <img src="${cover}" alt="${playlist.name}" style="width:100%;height:100%;object-fit:cover;" />
+                </div>
+                <div style="padding:8px 10px 10px;">
+                  <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${playlist.seriesNumber ? `#${playlist.seriesNumber} ` : ''}${playlist.name}
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);">${playlist.beats.length} beats</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
-  }).join('');
+  });
   
-  // Playlist click events
-  grid.querySelectorAll('.playlist-card').forEach(card => {
+  grid.innerHTML = html;
+  
+  grid.querySelectorAll('.series-see-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const seriesName = btn.dataset.series;
+      showSeriesDetail(seriesName);
+    });
+  });
+  
+  grid.querySelectorAll('.playlist-card-horizontal').forEach(card => {
     card.addEventListener('click', () => {
       const playlistId = card.dataset.playlistId;
       showPlaylistDetail(playlistId);
     });
   });
+}
 }
 
 function renderSamples() {
@@ -2864,6 +3002,15 @@ button:active {
   .full-player-overlay {
     display: none !important;
   }
+}
+
+/* Hide scrollbar for horizontal scrolling */
+.playlist-series-scroll::-webkit-scrollbar {
+  display: none;
+}
+.playlist-series-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
     
   </style>
