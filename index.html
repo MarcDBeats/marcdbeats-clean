@@ -1211,6 +1211,135 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 }
 
   // =============================================================
+// 📱 FULL PLAYER
+// =============================================================
+
+function openFullPlayer() {
+  const overlay = document.getElementById('fullPlayerOverlay');
+  if (overlay) {
+    overlay.classList.add('active');
+    syncFullPlayer();
+  }
+}
+
+function closeFullPlayer() {
+  const overlay = document.getElementById('fullPlayerOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+  }
+}
+
+function syncFullPlayer() {
+  const beat = state.currentBeat;
+  if (!beat) return;
+  
+  // Update artwork
+  const artwork = document.getElementById('fullPlayerArtwork');
+  if (artwork) {
+    const hasVideo = beat.video && beat.video.length > 0;
+    if (hasVideo) {
+      artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline style="width:100%;height:100%;object-fit:cover;"></video>`;
+    } else if (beat.artwork) {
+      artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+    } else {
+      artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
+    }
+  }
+  
+  // Update title
+  document.getElementById('fullPlayerTitle').textContent = beat.title;
+  document.getElementById('fullPlayerArtist').textContent = beat.artist;
+  
+  // Update like button state
+  const likeBtn = document.getElementById('fullPlayerLike');
+  if (likeBtn) {
+    likeBtn.classList.toggle('liked', isLiked(beat.id));
+  }
+  
+  // Sync progress
+  const audio = document.getElementById('audioPlayer');
+  if (audio) {
+    const progressSlider = document.getElementById('fullProgressSlider');
+    const timeCurrent = document.getElementById('fullTimeCurrent');
+    const timeTotal = document.getElementById('fullTimeTotal');
+    
+    if (!isNaN(audio.duration)) {
+      const progress = (audio.currentTime / audio.duration) * 100;
+      progressSlider.value = progress;
+      timeCurrent.textContent = formatTime(audio.currentTime);
+      timeTotal.textContent = formatTime(audio.duration);
+    }
+    
+    // Update play button state
+    const playBtn = document.getElementById('fullPlayerPlay');
+    if (playBtn) {
+      playBtn.innerHTML = state.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+    }
+  }
+}
+
+// Full player event listeners
+document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
+
+document.getElementById('fullPlayerPlay')?.addEventListener('click', () => {
+  const audio = document.getElementById('audioPlayer');
+  if (!audio || !audio.src) {
+    showToast('No audio available', 'fa-exclamation-circle');
+    return;
+  }
+  
+  if (state.isPlaying) {
+    audio.pause();
+    state.isPlaying = false;
+    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+  } else {
+    audio.play().catch(e => console.warn('Playback failed:', e));
+    state.isPlaying = true;
+    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+  }
+});
+
+document.getElementById('fullPlayerPrev')?.addEventListener('click', prevBeat);
+document.getElementById('fullPlayerNext')?.addEventListener('click', nextBeat);
+
+document.getElementById('fullPlayerLike')?.addEventListener('click', () => {
+  if (state.currentBeat) {
+    toggleLike(state.currentBeat.id);
+    const likeBtn = document.getElementById('fullPlayerLike');
+    if (likeBtn) {
+      likeBtn.classList.toggle('liked', isLiked(state.currentBeat.id));
+    }
+  }
+});
+
+document.getElementById('fullPlayerAddToCart')?.addEventListener('click', () => {
+  if (state.currentBeat) {
+    addToCart(state.currentBeat.id);
+  }
+});
+
+document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
+
+// Full player progress slider
+document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
+  const audio = document.getElementById('audioPlayer');
+  if (!isNaN(audio.duration) && audio.duration > 0) {
+    const seekTime = (parseFloat(this.value) / 100) * audio.duration;
+    audio.currentTime = seekTime;
+    document.getElementById('fullTimeCurrent').textContent = formatTime(seekTime);
+  }
+});
+
+// Sync full player with audio updates
+document.getElementById('audioPlayer')?.addEventListener('timeupdate', () => {
+  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) {
+    syncFullPlayer();
+  }
+});
+
+  // =============================================================
 // 📱 OFFTOP-STYLE RENDER FUNCTIONS
 // =============================================================
 
@@ -1520,6 +1649,15 @@ async function processPayment(beat, price) {
 
     document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
+
+    document.getElementById('spotifyPlayer')?.addEventListener('click', (e) => {
+  // Don't open if clicking on buttons
+  if (e.target.closest('button')) return;
+  if (state.currentBeat) {
+    openFullPlayer();
+    syncFullPlayer();
+  }
+});
     
 
 // Home button (cursive text) goes to Beat Store
@@ -2524,7 +2662,171 @@ button:active {
   margin-top: 2px;
 }
 
+/* ===== FULL PLAYER OVERLAY ===== */
+.full-player-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  padding: 20px;
+  animation: slideUp 0.3s ease;
+}
 
+.full-player-overlay.active {
+  display: flex;
+}
+
+.full-player-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 28px;
+  padding: 8px;
+  align-self: flex-start;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.full-player-artwork {
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1/1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #1a1a2e;
+  margin: 0 auto 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+.full-player-artwork img,
+.full-player-artwork video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.full-player-info {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.full-player-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.full-player-artist {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.full-player-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  margin-bottom: 24px;
+}
+
+.full-player-progress input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  transition: 0.2s;
+}
+
+.full-player-progress input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+}
+
+.full-player-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 40px;
+}
+
+.full-player-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.full-player-controls button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 32px;
+  cursor: pointer;
+  transition: 0.2s;
+  padding: 8px;
+  border-radius: 50%;
+}
+
+.full-player-controls button:hover {
+  color: var(--text-primary);
+}
+
+.full-player-controls #fullPlayerPlay {
+  width: 72px;
+  height: 72px;
+  font-size: 36px;
+  background: var(--gradient-1);
+  color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 8px 32px rgba(220, 38, 38, 0.3);
+}
+
+.full-player-actions {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.full-player-actions button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 28px;
+  cursor: pointer;
+  transition: 0.2s;
+  padding: 8px;
+}
+
+.full-player-actions button:hover {
+  color: var(--text-primary);
+}
+
+.full-player-actions .liked {
+  color: #22c55e;
+}
+
+/* Only show on mobile */
+@media (min-width: 769px) {
+  .full-player-overlay {
+    display: none !important;
+  }
+}
     
   </style>
 </head>
@@ -2632,6 +2934,8 @@ button:active {
 
   <div class="spotify-player" id="spotifyPlayer">
   <audio id="audioPlayer" style="display:none;"></audio>
+
+    
   
   <!-- Progress Bar -->
   <div style="display:flex;align-items:center;gap:10px;width:100%;padding:0 4px;">
@@ -2678,6 +2982,50 @@ button:active {
   </div>
 </div>
 
+<!-- Full Player Overlay -->
+<div class="full-player-overlay" id="fullPlayerOverlay">
+  <div class="full-player-content">
+    <!-- Close button -->
+    <button class="full-player-close" id="fullPlayerClose">
+      <i class="fas fa-chevron-down"></i>
+    </button>
+    
+    <!-- Artwork -->
+    <div class="full-player-artwork" id="fullPlayerArtwork">
+      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;">
+        <i class="fas fa-music"></i>
+      </div>
+    </div>
+    
+    <!-- Beat Info -->
+    <div class="full-player-info">
+      <div class="full-player-title" id="fullPlayerTitle">Select a beat</div>
+      <div class="full-player-artist" id="fullPlayerArtist">MarcDBeats</div>
+    </div>
+    
+    <!-- Progress Bar -->
+    <div class="full-player-progress">
+      <span class="full-player-time" id="fullTimeCurrent">0:00</span>
+      <input type="range" id="fullProgressSlider" min="0" max="100" value="0" />
+      <span class="full-player-time" id="fullTimeTotal">0:00</span>
+    </div>
+    
+    <!-- Controls -->
+    <div class="full-player-controls">
+      <button id="fullPlayerPrev"><i class="fas fa-step-backward"></i></button>
+      <button id="fullPlayerPlay"><i class="fas fa-play"></i></button>
+      <button id="fullPlayerNext"><i class="fas fa-step-forward"></i></button>
+    </div>
+    
+    <!-- Bottom Actions -->
+    <div class="full-player-actions">
+      <button id="fullPlayerLike"><i class="fas fa-heart"></i></button>
+      <button id="fullPlayerAddToCart"><i class="fas fa-plus-circle"></i></button>
+      <button id="fullPlayerCart"><i class="fas fa-shopping-cart"></i></button>
+    </div>
+  </div>
+</div>
+  
   <div class="toast" id="toast"><i class="fas fa-info-circle"></i> <span id="toastMsg">Ready</span></div>
 
   <div class="modal-overlay" id="modalOverlay">
