@@ -395,11 +395,17 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     state.singles = state.beats.filter(beat => beat.isSingle === true);
 
     const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
-    state.playlists = playlistIds.map(id => ({
-      id: id,
-      name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      beats: state.beats.filter(b => b.playlist === id).sort((a, b) => a.trackNumber - b.trackNumber)
-    }));
+state.playlists = playlistIds.map(id => {
+  const beats = state.beats.filter(b => b.playlist === id);
+  const firstBeat = beats[0];
+  return {
+    id: id,
+    name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    series: firstBeat?.series || '',
+    seriesNumber: firstBeat?.seriesNumber || 999,
+    beats: beats.sort((a, b) => a.trackNumber - b.trackNumber)
+  };
+});
 
     state.loaded = true;
     state.dataLoaded = true;
