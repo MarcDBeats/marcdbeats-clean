@@ -323,10 +323,10 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
         console.warn('No records found in Airtable');
         state.beats = [];
         state.loaded = true;
-        renderDiscover(0);
-        renderFeatured();
-        renderPlaylists();
-        renderSingles();
+        renderBeatStore();
+renderBeatTapes();
+renderSamples();
+renderSync();
         updateUI();
         showToast('No beats found in Airtable', 'fa-exclamation-circle');
         return;
@@ -1113,16 +1113,37 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
   // 🔄 TAB SWITCHING
   // =============================================================
   function switchTab(tab) {
-    document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
+  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
 
-    document.querySelectorAll('.discover-view, .featured-view, .playlists-view, .singles-view').forEach(v => v.classList.remove('active'));
-    document.getElementById(`${tab}View`)?.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(v => v.classList.remove('active'));
+  document.getElementById(`${tab}Content`)?.classList.add('active');
 
-    if (tab === 'featured') renderFeatured();
-    if (tab === 'playlists') renderPlaylists();
-    if (tab === 'singles') renderSingles();
-  }
+  // Render the appropriate content
+  if (tab === 'beatstore') renderBeatStore();
+  if (tab === 'beattapes') renderBeatTapes();
+  if (tab === 'samples') renderSamples();
+  if (tab === 'sync') renderSync();
+}
+
+  // Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const filter = btn.dataset.filter;
+    const activeTab = document.querySelector('.tab-nav .active');
+    if (activeTab) {
+      const tab = activeTab.dataset.tab;
+      // Re-render with filter (you can expand this later)
+      if (tab === 'beatstore') renderBeatStore();
+      if (tab === 'beattapes') renderBeatTapes();
+      if (tab === 'samples') renderSamples();
+      if (tab === 'sync') renderSync();
+    }
+  });
+});
 
   // =============================================================
   // 🧭 NAVIGATION HELPERS
@@ -1182,6 +1203,184 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
 
     updateCartBadge();
   }
+
+  // =============================================================
+// 📱 OFFTOP-STYLE RENDER FUNCTIONS
+// =============================================================
+
+function renderBeatStore() {
+  const grid = document.getElementById('beatStoreGrid');
+  if (!grid) return;
+  
+  const beats = state.beats.filter(b => b.featured === true);
+  if (beats.length === 0) {
+    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No featured beats yet</div>`;
+    return;
+  }
+  
+  grid.innerHTML = beats.map(beat => `
+    <div class="beat-card" data-beat-id="${beat.id}">
+      <div class="beat-card-art">
+        <img src="${beat.artwork}" alt="${beat.title}" />
+        ${beat.featured ? '<span class="featured-badge">🔥</span>' : ''}
+      </div>
+      <div class="beat-card-info">
+        <div class="beat-card-title">${beat.title}</div>
+        <div class="beat-card-artist">${beat.artist}</div>
+      </div>
+      <div class="beat-card-actions">
+        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
+        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
+        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+          <i class="fas fa-heart"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+  
+  // Add event listeners
+  attachBeatCardEvents();
+}
+
+function renderBeatTapes() {
+  const grid = document.getElementById('beatTapesGrid');
+  if (!grid) return;
+  
+  const playlists = state.playlists;
+  if (playlists.length === 0) {
+    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No beat tapes yet</div>`;
+    return;
+  }
+  
+  grid.innerHTML = playlists.map(playlist => {
+    const cover = getPlaylistCover(playlist);
+    return `
+      <div class="playlist-card" data-playlist-id="${playlist.id}">
+        <div class="cover"><img src="${cover}" alt="${playlist.name}" /></div>
+        <div class="info">
+          <div class="name">${playlist.name}</div>
+          <div class="count">${playlist.beats.length} beats</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Playlist click events
+  grid.querySelectorAll('.playlist-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const playlistId = card.dataset.playlistId;
+      showPlaylistDetail(playlistId);
+    });
+  });
+}
+
+function renderSamples() {
+  const grid = document.getElementById('samplesGrid');
+  if (!grid) return;
+  
+  const samples = state.beats.filter(b => b.isSingle === true);
+  if (samples.length === 0) {
+    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No samples yet</div>`;
+    return;
+  }
+  
+  grid.innerHTML = samples.map(beat => `
+    <div class="beat-card" data-beat-id="${beat.id}">
+      <div class="beat-card-art">
+        <img src="${beat.artwork}" alt="${beat.title}" />
+      </div>
+      <div class="beat-card-info">
+        <div class="beat-card-title">${beat.title}</div>
+        <div class="beat-card-artist">${beat.artist}</div>
+      </div>
+      <div class="beat-card-actions">
+        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
+        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
+        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+          <i class="fas fa-heart"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+  
+  attachBeatCardEvents();
+}
+
+function renderSync() {
+  const grid = document.getElementById('syncGrid');
+  if (!grid) return;
+  
+  const syncBeats = state.beats.filter(b => b.featured === true);
+  if (syncBeats.length === 0) {
+    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No sync beats yet</div>`;
+    return;
+  }
+  
+  grid.innerHTML = syncBeats.map(beat => `
+    <div class="beat-card" data-beat-id="${beat.id}">
+      <div class="beat-card-art">
+        <img src="${beat.artwork}" alt="${beat.title}" />
+        <span class="featured-badge">🎬</span>
+      </div>
+      <div class="beat-card-info">
+        <div class="beat-card-title">${beat.title}</div>
+        <div class="beat-card-artist">${beat.artist}</div>
+      </div>
+      <div class="beat-card-actions">
+        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
+        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
+        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+          <i class="fas fa-heart"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+  
+  attachBeatCardEvents();
+}
+
+// Helper: Attach events to beat cards
+function attachBeatCardEvents() {
+  document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const beatId = parseInt(btn.dataset.beatId);
+      const beat = getBeat(beatId);
+      if (beat) {
+        const index = state.beats.indexOf(beat);
+        renderCard(beat, index, state.beats);
+      }
+    });
+  });
+  
+  document.querySelectorAll('.beat-card .cart-sm').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const beatId = parseInt(btn.dataset.beatId);
+      addToCart(beatId);
+    });
+  });
+  
+  document.querySelectorAll('.beat-card .like-sm').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const beatId = parseInt(btn.dataset.beatId);
+      toggleLike(beatId);
+      btn.classList.toggle('liked');
+    });
+  });
+  
+  document.querySelectorAll('.beat-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const beatId = parseInt(card.dataset.beatId);
+      const beat = getBeat(beatId);
+      if (beat) {
+        const index = state.beats.indexOf(beat);
+        renderCard(beat, index, state.beats);
+      }
+    });
+  });
+}
 
 // =============================================================
 // 💳 STRIPE PAYMENT
@@ -2017,6 +2216,239 @@ button:active {
 .modal-box .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.08) !important;
 }
+
+/* ===== OFFTOP-STYLE TABS ===== */
+
+/* Tab Navigation */
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-nav button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: 0.2s;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.tab-nav button.active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tab-nav button:hover {
+  color: var(--text-secondary);
+}
+
+/* Filter Row */
+.filter-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.filter-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: 0.2s;
+  border-radius: 12px;
+}
+
+.filter-btn.active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.filter-btn:hover {
+  color: var(--text-secondary);
+}
+
+/* Tab Content Area */
+.tab-content-area {
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+.tab-content {
+  display: none;
+  padding: 8px 16px;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Beat Grid - Offtop Style */
+.beat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.beat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.beat-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.beat-card-art {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.beat-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.beat-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.beat-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.beat-card-artist {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.beat-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.beat-card-actions button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: 0.2s;
+  font-size: 14px;
+}
+
+.beat-card-actions .play-sm:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.beat-card-actions .cart-sm:hover {
+  color: var(--accent);
+}
+
+.beat-card-actions .like-sm.liked {
+  color: #22c55e;
+}
+
+/* Playlist Grid (already exists, keep as-is) */
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+/* Playlist Card (already exists, keep as-is) */
+.playlist-grid .playlist-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.playlist-grid .playlist-card:hover {
+  border-color: var(--accent);
+  transform: scale(1.02);
+}
+
+.playlist-grid .playlist-card .cover {
+  width: 100%;
+  aspect-ratio: 1/1;
+  overflow: hidden;
+  background: var(--bg-card-hover);
+}
+
+.playlist-grid .playlist-card .cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-grid .playlist-card .info {
+  padding: 10px 12px 12px;
+}
+
+.playlist-grid .playlist-card .info .name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-grid .playlist-card .info .count {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
     
   </style>
 </head>
@@ -2046,59 +2478,74 @@ button:active {
   </div>
 
   <div class="tab-nav" id="tabNav">
-    <button class="active" data-tab="discover">Explore</button>
-    <button data-tab="featured">Featured <span class="tab-count" id="featuredTabCount">0</span></button>
-    <button data-tab="playlists">Albums <span class="tab-count" id="playlistsTabCount">0</span></button>
-  </div>
-
-  <div class="content-area">
-
-    <div class="discover-view active" id="discoverView">
-  <div class="swipe-container" id="swipeContainer" style="position:relative;height:100%;">
-    <!-- Beat Display -->
-    <div id="exploreBeatDisplay" style="width:100%;height:100%;padding:8px;">
-    </div>
-  </div>
+  <button class="active" data-tab="beatstore">Beat Store</button>
+  <button data-tab="beattapes">Beat Tapes</button>
+  <button data-tab="samples">Samples</button>
+  <button data-tab="sync">Sync</button>
 </div>
 
-    <div class="featured-view" id="featuredView">
-      <div class="featured-grid" id="featuredGrid"></div>
-    </div>
+  <!-- Filter Row -->
+<div class="filter-row" id="filterRow">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="recent">Recent</button>
+  <button class="filter-btn" data-filter="featured">Featured</button>
+</div>
 
-    <div class="playlists-view" id="playlistsView">
-      <div class="playlist-grid" id="playlistGrid"></div>
-    </div>
+<div class="content-area">
 
-    <div class="playlist-detail" id="playlistDetail">
-      <div class="detail-header">
-        <button class="back-btn" id="detailBack"><i class="fas fa-arrow-left"></i></button>
-        <div class="detail-title" id="detailTitle">Playlist</div>
-        <div class="detail-count" id="detailCount">0 beats</div>
-      </div>
-      <div class="detail-tracklist" id="detailTracklist"></div>
+  <!-- Tab Content Area -->
+  <div class="tab-content-area">
+    
+    <!-- Beat Store Tab -->
+    <div class="tab-content active" id="beatstoreContent">
+      <div class="beat-grid" id="beatStoreGrid"></div>
     </div>
-
-    <div class="singles-view" id="singlesView">
-      <div class="singles-grid" id="singlesGrid"></div>
+    
+    <!-- Beat Tapes Tab -->
+    <div class="tab-content" id="beattapesContent">
+      <div class="playlist-grid" id="beatTapesGrid"></div>
     </div>
-
-    <div class="portal-view" id="portalView">
-      <div class="portal-header">
-        <button class="back-btn" id="portalBack"><i class="fas fa-arrow-left"></i></button>
-        <h2>My Account</h2>
-      </div>
-      <div id="portalContent"></div>
+    
+    <!-- Samples Tab -->
+    <div class="tab-content" id="samplesContent">
+      <div class="beat-grid" id="samplesGrid"></div>
     </div>
-
-    <div class="terms-view" id="termsView">
-      <div class="terms-header">
-        <button class="back-btn" id="termsBack"><i class="fas fa-arrow-left"></i></button>
-        <h2>Terms & Policies</h2>
-      </div>
-      <div id="termsContent"></div>
+    
+    <!-- Sync Tab -->
+    <div class="tab-content" id="syncContent">
+      <div class="beat-grid" id="syncGrid"></div>
     </div>
 
   </div>
+
+  <!-- Keep playlist detail and other views -->
+  <div class="playlist-detail" id="playlistDetail">
+    <div class="detail-header">
+      <button class="back-btn" id="detailBack"><i class="fas fa-arrow-left"></i></button>
+      <div class="detail-title" id="detailTitle">Playlist</div>
+      <div class="detail-count" id="detailCount">0 beats</div>
+    </div>
+    <div class="detail-tracklist" id="detailTracklist"></div>
+  </div>
+
+  <!-- Keep portal and terms views -->
+  <div class="portal-view" id="portalView">
+    <div class="portal-header">
+      <button class="back-btn" id="portalBack"><i class="fas fa-arrow-left"></i></button>
+      <h2>My Account</h2>
+    </div>
+    <div id="portalContent"></div>
+  </div>
+
+  <div class="terms-view" id="termsView">
+    <div class="terms-header">
+      <button class="back-btn" id="termsBack"><i class="fas fa-arrow-left"></i></button>
+      <h2>Terms & Policies</h2>
+    </div>
+    <div id="termsContent"></div>
+  </div>
+
+</div>
 
   <div class="spotify-player" id="spotifyPlayer">
   <audio id="audioPlayer" style="display:none;"></audio>
