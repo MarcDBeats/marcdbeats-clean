@@ -370,11 +370,13 @@ renderSync();
 
       state.loaded = true;
 
-      renderDiscover(0);
-      renderFeatured();
-      renderPlaylists();
-      renderSingles();
-      updateUI();
+// These are the new ones - KEEP these
+renderBeatStore();
+renderBeatTapes();
+renderSamples();
+renderSync();
+
+updateUI();
 
       console.log(`Loaded ${state.beats.length} beats from Airtable`);
       console.log(`${state.playlists.length} playlists`);
