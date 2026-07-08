@@ -1184,27 +1184,31 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   // 🔄 UI UPDATE
   // =============================================================
   function updateUI() {
-    const likesCount = state.likes.length;
-    const badge = document.getElementById('likesBadge');
-    if (badge) {
-      badge.style.display = likesCount > 0 ? 'block' : 'none';
-    }
-
-    const authBtn = document.getElementById('authNavBtn');
-    if (authBtn) {
-      if (isLoggedIn()) {
-        authBtn.textContent = state.user.email.split('@')[0];
-        authBtn.style.background = 'rgba(255,255,255,0.06)';
-        authBtn.style.color = 'var(--text-secondary)';
-      } else {
-        authBtn.textContent = 'Sign In';
-        authBtn.style.background = 'var(--gradient-1)';
-        authBtn.style.color = '#fff';
-      }
-    }
-
-    updateCartBadge();
+  const likesCount = state.likes.length;
+  const badge = document.getElementById('likesBadge');
+  if (badge) {
+    badge.style.display = likesCount > 0 ? 'block' : 'none';
   }
+
+  const authBtn = document.getElementById('authNavBtn');
+  if (authBtn) {
+    if (isLoggedIn()) {
+      // Show user icon when logged in
+      authBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
+      authBtn.style.background = 'none';
+      authBtn.style.color = 'var(--text-secondary)';
+      authBtn.title = state.user.email;
+    } else {
+      // Show user icon when logged out
+      authBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
+      authBtn.style.background = 'none';
+      authBtn.style.color = 'var(--text-secondary)';
+      authBtn.title = 'Sign In';
+    }
+  }
+
+  updateCartBadge();
+}
 
   // =============================================================
 // 📱 OFFTOP-STYLE RENDER FUNCTIONS
@@ -1516,6 +1520,20 @@ async function processPayment(beat, price) {
 
     document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
+    
+
+// Home button (cursive text) goes to Beat Store
+document.getElementById('homeNavBtn')?.addEventListener('click', () => {
+  // Switch to Beat Store tab
+  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+  document.querySelector('.tab-nav button[data-tab="beatstore"]')?.classList.add('active');
+  
+  document.querySelectorAll('.tab-content').forEach(v => v.classList.remove('active'));
+  document.getElementById('beatstoreContent')?.classList.add('active');
+  
+  renderBeatStore();
+  closeAllViews();
+});
     document.getElementById('termsNavBtn')?.addEventListener('click', showTerms);
     document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
     document.getElementById('detailBack')?.addEventListener('click', closeAllViews);
@@ -1690,18 +1708,85 @@ async function processPayment(beat, price) {
     }
     html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: none; user-select: none; }
     .app { max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; background: var(--bg-secondary); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0, 0, 0, 0.9); overflow: hidden; }
-        .header {
-      padding: 18px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-      z-index: 30;
-      background: rgba(10, 10, 15, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
+        /* New Header Layout */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  flex-shrink: 0;
+  z-index: 30;
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.brand-cursive {
+  font-family: 'Georgia', 'Times New Roman', cursive;
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.brand-cursive:hover {
+  opacity: 0.8;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.header-logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+}
+
+.header-right {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-right button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.header-right button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Hide old elements */
+.header-brand,
+.header-actions .badge-dot,
+.header-actions #likesNavBtn,
+.header-actions #termsNavBtn {
+  display: none !important;
+}
     .header-brand .logo-icon {
       width: 40px;
       height: 40px;
@@ -2141,20 +2226,7 @@ async function processPayment(beat, price) {
   box-shadow: 0 6px 24px rgba(220, 38, 38, 0.4) !important;
 }
     .cart-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: var(--gradient-1);
-  color: #fff;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  font-size: 10px;
-  font-weight: 700;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--bg-primary);
+  display: none !important;
 }
 
 /* Global button improvements */
@@ -2451,6 +2523,8 @@ button:active {
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+
     
   </style>
 </head>
@@ -2459,19 +2533,26 @@ button:active {
 <div class="app" id="app">
 
   <header class="header">
-    <div class="header-brand">
-      <div class="logo-icon">
-        <img src="https://res.cloudinary.com/lseynzv6/image/upload/v1783301061/MarcDBeats_Final_White_Icon_ifeydf.png" alt="MarcDBeats" style="width:100%;height:100%;object-fit:cover;" />
-      </div>
-    </div>
-    <div class="header-actions">
-      <button id="cartNavBtn" title="Cart"><i class="fas fa-shopping-cart"></i><span class="cart-badge" id="cartBadge">0</span></button>
-      <button id="portalNavBtn" title="My Account"><i class="fas fa-user"></i></button>
-      <button id="likesNavBtn" title="Your Likes"><i class="fas fa-heart"></i><span class="badge-dot" id="likesBadge" style="display:none;"></span></button>
-      <button id="termsNavBtn" title="Terms & Policies" style="font-size:16px;"><i class="fas fa-file-contract"></i></button>
-      <button id="authNavBtn" class="auth-btn">Sign In</button>
-    </div>
-  </header>
+  <!-- Left: Cursive brand name -->
+  <div class="header-left">
+    <span class="brand-cursive" id="homeNavBtn">marcdbeats</span>
+  </div>
+  
+  <!-- Middle: Logo -->
+  <div class="header-center">
+    <img src="https://res.cloudinary.com/lseynzv6/image/upload/v1783301061/MarcDBeats_Final_White_Icon_ifeydf.png" alt="MarcDBeats" class="header-logo" />
+  </div>
+  
+  <!-- Right: Cart + Profile -->
+  <div class="header-right">
+    <button id="cartNavBtn" title="Cart">
+      <i class="fas fa-shopping-cart"></i>
+    </button>
+    <button id="authNavBtn" class="auth-btn">
+      <i class="fas fa-user-circle"></i>
+    </button>
+  </div>
+</header>
 
   <div class="search-container">
     <i class="fas fa-search"></i>
