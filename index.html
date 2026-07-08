@@ -365,29 +365,30 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     }
 
     state.beats = data.records.map(record => ({
-      id: parseInt(record.id, 36),
-      title: record.fields['Beat Name'] || 'Untitled',
-      artist: record.fields['Artist'] || 'Unknown',
-      genre: record.fields['Genre'] || '',
-      price: record.fields['Price'] || 0,
-      bpm: record.fields['BPM'] || '',
-      artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
-      video: record.fields['Video'] || '',
-      mp3: record.fields['MP3'] || '',
-      views: 0,
-      socialLikes: 0,
-      tags: record.fields['Tags'] || [],
-      duration: '',
-      releaseDate: '',
-      playlist: record.fields['Playlist'] || '',
-      isSingle: record.fields['Is Single'] || false,
-      trackNumber: record.fields['Track Number'] || 999,
-      featured: record.fields['Featured'] || false,
-      tikTok: record.fields['Tik Tok'] || '',
-      instagram: record.fields['Instagram'] || '',
-      searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
-    }));
-
+  id: parseInt(record.id, 36),
+  title: record.fields['Beat Name'] || 'Untitled',
+  artist: record.fields['Artist'] || 'Unknown',
+  genre: record.fields['Genre'] || '',
+  price: record.fields['Price'] || 5.00,
+  bpm: record.fields['BPM'] || '',
+  artwork: record.fields['Artwork'] || 'https://via.placeholder.com/400x400/DC2626/FFFFFF?text=BEAT',
+  video: record.fields['Video'] || '',
+  mp3: record.fields['MP3'] || '',
+  views: 0,
+  socialLikes: 0,
+  tags: record.fields['Tags'] || [],
+  duration: '',
+  releaseDate: '',
+  playlist: record.fields['Playlist'] || '',
+  series: record.fields['Series'] || '',
+  seriesNumber: record.fields['Series Number'] || 999, // ← Using your field name
+  sync: record.fields['Sync'] || false,
+  trackNumber: record.fields['Track Number'] || 999,
+  featured: record.fields['Featured'] || false,
+  tikTok: record.fields['Tik Tok'] || '',
+  instagram: record.fields['Instagram'] || '',
+  searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
+}));
     // Shuffle beats for random order
     state.beats = shuffleArray(state.beats);
     state.featured = state.beats.filter(b => b.featured === true);
