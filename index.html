@@ -502,75 +502,146 @@ state.playlists = playlistIds.map(id => {
   const container = document.getElementById('exploreBeatDisplay');
   if (!container) return;
   
+  // Show the beat artwork
   const hasArtwork = beat.artwork && beat.artwork.length > 0;
-  
   let mediaHTML = '';
   if (hasArtwork) {
     mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
   } else {
     mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
   }
-    
-        container.innerHTML = `
-      <div style="width:100%;height:85%;position:relative;border-radius:20px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.5);margin:0 auto;">
-        <div style="width:100%;height:100%;overflow:hidden;background:var(--bg-card-hover);">
-          ${mediaHTML}
-        </div>
-        <div style="position:absolute;bottom:0;left:0;right:0;height:45%;background:linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
-        <div style="position:absolute;bottom:20px;left:24px;right:24px;z-index:2;pointer-events:none;">
-          <h2 style="font-size:24px;font-weight:700;margin-bottom:4px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.title}</h2>
-          <p style="color:var(--text-secondary);font-size:16px;margin-bottom:2px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.artist}</p>
-          <p style="color:var(--text-muted);font-size:13px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.genre}</p>
-        </div>
+  
+  // Show the card
+  container.innerHTML = `
+    <div style="width:100%;height:85%;position:relative;border-radius:20px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.5);margin:0 auto;">
+      <div style="width:100%;height:100%;overflow:hidden;background:var(--bg-card-hover);">
+        ${mediaHTML}
       </div>
-    `;
-    
-    state.playerQueue = queue || state.beats;
-    state.currentIndex = index;
-    state.currentBeat = beat;
-    state.currentBeat.video = beat.video;
-    updatePlayer(beat);
-    
-        const audio = document.getElementById('audioPlayer');
-if (audio) {
-  if (beat.mp3) {
-    console.log('🎵 Loading MP3:', beat.mp3);
-    audio.src = beat.mp3;
-    audio.load();
-    
-    // Reset progress bar
-    const progressSlider = document.getElementById('progressSlider');
-    const timeCurrent = document.getElementById('timeCurrent');
-    const timeTotal = document.getElementById('timeTotal');
-    if (progressSlider) progressSlider.value = 0;
-    if (timeCurrent) timeCurrent.textContent = '0:00';
-    if (timeTotal) timeTotal.textContent = '0:00';
-    
-    // Try to play
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log('✅ Audio playing');
-          state.isPlaying = true;
-          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-        })
-        .catch(err => {
-          console.warn('⚠️ Autoplay blocked:', err);
-          // User needs to click play manually
-          state.isPlaying = false;
-          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
-          showToast('Tap play to start audio', 'fa-play');
-        });
+      <div style="position:absolute;bottom:0;left:0;right:0;height:45%;background:linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
+      <div style="position:absolute;bottom:20px;left:24px;right:24px;z-index:2;pointer-events:none;">
+        <h2 style="font-size:24px;font-weight:700;margin-bottom:4px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.title}</h2>
+        <p style="color:var(--text-secondary);font-size:16px;margin-bottom:2px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.artist}</p>
+        <p style="color:var(--text-muted);font-size:13px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.genre}</p>
+      </div>
+    </div>
+  `;
+  
+  // Remember what's playing
+  state.playerQueue = queue || state.beats;
+  state.currentIndex = index;
+  state.currentBeat = beat;
+  
+  // 👇 THIS IS THE NEW IMPORTANT PART 👇
+  // Update the bottom player AND the big player
+  updateBottomPlayer(beat);  // <-- New function!
+  updateFullPlayer(beat);   // <-- New function!
+  
+  // Load and play the audio
+  const audio = document.getElementById('audioPlayer');
+  if (audio) {
+    if (beat.mp3) {
+      console.log('🎵 Loading MP3:', beat.mp3);
+      audio.src = beat.mp3;
+      audio.load();
+      
+      // Reset progress bar
+      const progressSlider = document.getElementById('progressSlider');
+      const timeCurrent = document.getElementById('timeCurrent');
+      const timeTotal = document.getElementById('timeTotal');
+      if (progressSlider) progressSlider.value = 0;
+      if (timeCurrent) timeCurrent.textContent = '0:00';
+      if (timeTotal) timeTotal.textContent = '0:00';
+      
+      // Try to play
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ Audio playing');
+            state.isPlaying = true;
+            document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+            document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+          })
+          .catch(err => {
+            console.warn('⚠️ Autoplay blocked:', err);
+            state.isPlaying = false;
+            document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+            document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+            showToast('Tap play to start audio', 'fa-play');
+          });
+      }
+    } else {
+      console.warn('⚠️ No MP3 found for beat:', beat.title);
+      showToast('No audio available for this beat', 'fa-exclamation-circle');
     }
-  } else {
-    console.warn('⚠️ No MP3 found for beat:', beat.title);
-    showToast('No audio available for this beat', 'fa-exclamation-circle');
   }
 }
+
+  // This updates the bottom player (the one at the bottom of the screen)
+function updateBottomPlayer(beat) {
+  if (!beat) return;
+  
+  // Update the title and artist
+  const titleEl = document.getElementById('playerTitle');
+  const artistEl = document.getElementById('playerArtist');
+  if (titleEl) titleEl.textContent = beat.title;
+  if (artistEl) artistEl.textContent = beat.artist;
+  
+  // Update the artwork (the picture)
+  const artwork = document.getElementById('playerArtwork');
+  if (artwork) {
+    if (beat.artwork) {
+      artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+    } else {
+      artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
+    }
   }
+  
+  // Update the like button (heart icon)
+  const liked = isLiked(beat.id);
+  const likeBtn = document.getElementById('playerLike');
+  if (likeBtn) {
+    if (liked) {
+      likeBtn.classList.add('liked');
+      likeBtn.style.color = '#22c55e';
+    } else {
+      likeBtn.classList.remove('liked');
+      likeBtn.style.color = 'var(--text-muted)';
+    }
+  }
+}
+
+// This updates the full player (the big one that pops up)
+function updateFullPlayer(beat) {
+  if (!beat) return;
+  
+  // Update title and artist in full player
+  document.getElementById('fullPlayerTitle').textContent = beat.title;
+  document.getElementById('fullPlayerArtist').textContent = beat.artist;
+  
+  // Update artwork in full player
+  const artwork = document.getElementById('fullPlayerArtwork');
+  if (artwork) {
+    if (beat.artwork) {
+      artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+    } else {
+      artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
+    }
+  }
+  
+  // Update like button in full player
+  const liked = isLiked(beat.id);
+  const likeBtn = document.getElementById('fullPlayerLike');
+  if (likeBtn) {
+    if (liked) {
+      likeBtn.classList.add('liked');
+      likeBtn.style.color = '#22c55e';
+    } else {
+      likeBtn.classList.remove('liked');
+      likeBtn.style.color = 'var(--text-muted)';
+    }
+  }
+}
 
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
@@ -1713,25 +1784,19 @@ function renderSync() {
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
-  document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const beatId = parseInt(btn.dataset.beatId);
-      const beat = getBeat(beatId);
-      if (beat) {
-        const index = state.beats.indexOf(beat);
-        renderCard(beat, index, state.beats);
-      }
-    });
+// This code runs when you click the PLAY button on a beat card
+document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();  // Don't trigger the card click too
+    
+    const beatId = parseInt(this.dataset.beatId);
+    const beat = getBeat(beatId);
+    if (beat) {
+      const index = state.beats.indexOf(beat);
+      renderCard(beat, index, state.beats);  // This now updates everything!
+    }
   });
-  
-  document.querySelectorAll('.beat-card .cart-sm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const beatId = parseInt(btn.dataset.beatId);
-      addToCart(beatId);
-    });
-  });
+});
 
 document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
   btn.addEventListener('click', (e) => {
@@ -1751,6 +1816,18 @@ document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
   });
   
   document.querySelectorAll('.beat-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const beatId = parseInt(card.dataset.beatId);
+    const beat = getBeat(beatId);
+    if (beat) {
+      const index = state.beats.indexOf(beat);
+      renderCard(beat, index, state.beats);
+    }
+  });
+});
+
+  // Beat card click - plays audio
+document.querySelectorAll('.beat-card').forEach(card => {
   card.addEventListener('click', () => {
     const beatId = parseInt(card.dataset.beatId);
     const beat = getBeat(beatId);
