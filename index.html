@@ -1565,7 +1565,7 @@ function renderBeatStore() {
   
   const beats = state.beats
   .filter(b => b.featured === true)
-  .sort((a, b) => (a.order || 999) - (b.order || 999));
+  .sort((a, b) => (a.Order || 999) - (b.Order || 999));
   if (beats.length === 0) {
     grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No featured beats yet</div>`;
     return;
