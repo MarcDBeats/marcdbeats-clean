@@ -428,6 +428,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   featured: record.fields['Featured'] || false,
   tikTok: record.fields['Tik Tok'] || '',
   instagram: record.fields['Instagram'] || '',
+      Order: record.fields['Order'] || 999,
   searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
 }));
     // Shuffle beats for random order
