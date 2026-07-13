@@ -1477,6 +1477,7 @@ function syncFullPlayer() {
   const likeBtn = document.getElementById('fullPlayerLike');
   if (likeBtn) {
     likeBtn.classList.toggle('liked', isLiked(beat.id));
+    likeBtn.style.color = isLiked(beat.id) ? '#22c55e' : 'var(--text-muted)';
   }
   
   // Sync progress
@@ -1486,11 +1487,11 @@ function syncFullPlayer() {
     const timeCurrent = document.getElementById('fullTimeCurrent');
     const timeTotal = document.getElementById('fullTimeTotal');
     
-    if (!isNaN(audio.duration)) {
+    if (!isNaN(audio.duration) && audio.duration > 0) {
       const progress = (audio.currentTime / audio.duration) * 100;
-      progressSlider.value = progress;
-      timeCurrent.textContent = formatTime(audio.currentTime);
-      timeTotal.textContent = formatTime(audio.duration);
+      if (progressSlider) progressSlider.value = progress;
+      if (timeCurrent) timeCurrent.textContent = formatTime(audio.currentTime);
+      if (timeTotal) timeTotal.textContent = formatTime(audio.duration);
     }
     
     // Update play button state
@@ -1500,67 +1501,6 @@ function syncFullPlayer() {
     }
   }
 }
-
-// Full player event listeners
-document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
-
-document.getElementById('fullPlayerPlay')?.addEventListener('click', () => {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || !audio.src) {
-    showToast('No audio available', 'fa-exclamation-circle');
-    return;
-  }
-  
-  if (state.isPlaying) {
-    audio.pause();
-    state.isPlaying = false;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-  } else {
-    audio.play().catch(e => console.warn('Playback failed:', e));
-    state.isPlaying = true;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-  }
-});
-
-document.getElementById('fullPlayerPrev')?.addEventListener('click', prevBeat);
-document.getElementById('fullPlayerNext')?.addEventListener('click', nextBeat);
-
-document.getElementById('fullPlayerLike')?.addEventListener('click', () => {
-  if (state.currentBeat) {
-    toggleLike(state.currentBeat.id);
-    const likeBtn = document.getElementById('fullPlayerLike');
-    if (likeBtn) {
-      likeBtn.classList.toggle('liked', isLiked(state.currentBeat.id));
-    }
-  }
-});
-
-document.getElementById('fullPlayerAddToCart')?.addEventListener('click', () => {
-  if (state.currentBeat) {
-    addToCart(state.currentBeat.id);
-  }
-});
-
-document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
-
-// Full player progress slider
-document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
-  const audio = document.getElementById('audioPlayer');
-  if (!isNaN(audio.duration) && audio.duration > 0) {
-    const seekTime = (parseFloat(this.value) / 100) * audio.duration;
-    audio.currentTime = seekTime;
-    document.getElementById('fullTimeCurrent').textContent = formatTime(seekTime);
-  }
-});
-
-// Sync full player with audio updates
-document.getElementById('audioPlayer')?.addEventListener('timeupdate', () => {
-  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) {
-    syncFullPlayer();
-  }
-});
 
   // =============================================================
 // 📱 OFFTOP-STYLE RENDER FUNCTIONS
@@ -1902,8 +1842,8 @@ function showCheckoutModal(beat) {
     }
 
     showToast('Payment coming soon! 🚀', 'fa-rocket');
-document.getElementById('modalOverlay').classList.remove('active');
-  });
+    document.getElementById('modalOverlay').classList.remove('active');
+});
 
   document.getElementById('modalOverlay').classList.add('active');
 }
