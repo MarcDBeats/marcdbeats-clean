@@ -1780,7 +1780,7 @@ function renderSync() {
   `).join('');
   
   attachBeatCardEvents();
-
+}
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
   console.log('🎯 Attaching beat card events...');
@@ -1929,7 +1929,8 @@ function showCheckoutModal(beat) {
       return;
     }
 
-    await processPayment(beat, 19.99);
+    showToast('Payment coming soon! 🚀', 'fa-rocket');
+document.getElementById('modalOverlay').classList.remove('active');
   });
 
   document.getElementById('modalOverlay').classList.add('active');
