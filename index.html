@@ -431,7 +431,6 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   searchKeywords: `${record.fields['Beat name'] || ''} ${record.fields['Artist'] || ''} ${record.fields['Genre'] || ''} ${record.fields['Tik Tok'] || ''} ${record.fields['Instagram'] || ''}`
 }));
     // Shuffle beats for random order
-    state.beats = shuffleArray(state.beats);
     state.featured = state.beats
   .filter(b => b.featured === true)
   .sort((a, b) => (a.order || 999) - (b.order || 999));
