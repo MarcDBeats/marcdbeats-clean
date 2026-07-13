@@ -1376,10 +1376,17 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     }
 
     await loadBeatData();
-    const firstFeatured = state.beats.find(b => b.featured === true);
+const firstFeatured = state.beats.find(b => b.featured === true);
 if (firstFeatured) {
   const index = state.beats.indexOf(firstFeatured);
   renderCard(firstFeatured, index, state.beats);
+  // Auto-play the audio
+  setTimeout(() => {
+    const audio = document.getElementById('audioPlayer');
+    if (audio && firstFeatured.mp3) {
+      audio.play().catch(e => console.log('Autoplay blocked:', e));
+    }
+  }, 500);
 }
 
     const overlay = document.getElementById('onboardingOverlay');
