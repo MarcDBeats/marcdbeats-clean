@@ -730,24 +730,23 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     let total = 0;
     modalBox.innerHTML = `
       <h2>Your Cart (${state.cart.length})</h2>
-      <p class="sub">Pay What You Want for each beat (minimum $1)</p>
+      <p class="sub">Each license is $19.99</p>
       ${state.cart.map(beat => `
-        <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-            <div>
-              <div style="font-weight:600;">${beat.title}</div>
-              <div style="font-size:13px;color:var(--text-muted);">${beat.artist}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:13px;color:var(--text-muted);">$</span>
-              <input type="number" class="cart-price-input" data-beat-id="${beat.id}" value="1" min="1" step="0.50" style="width:70px;padding:6px 8px;border-radius:8px;border:1px solid var(--border-subtle);background:rgba(255,255,255,0.05);color:var(--text-primary);text-align:center;" />
-              <button class="cart-item-remove" data-beat-id="${beat.id}" style="background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:4px 6px;">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join('')}
+  <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-weight:600;">${beat.title}</div>
+        <div style="font-size:13px;color:var(--text-muted);">${beat.artist}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;font-weight:600;color:var(--accent);">$19.99</span>
+        <button class="cart-item-remove" data-beat-id="${beat.id}" style="background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:4px 6px;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+`).join('')}
       <div style="padding:12px 0;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
         <span style="font-weight:600;">Total</span>
         <span style="font-weight:700;color:var(--accent);font-size:20px;" id="cartTotal">$0.00</span>
@@ -810,14 +809,12 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     return;
   }
 
-  // Show the first beat in cart with price picker
-  const firstBeat = state.cart[0];
-  
   // Close cart modal
   document.getElementById('modalOverlay').classList.remove('active');
   
-  // Show price picker for the first beat
-  showPricePicker(firstBeat);
+  // Show checkout for the first beat
+  const firstBeat = state.cart[0];
+  handleBuy(firstBeat.id);
 }
 
   // =============================================================
@@ -1467,24 +1464,26 @@ function renderBeatStore() {
   }
   
   grid.innerHTML = beats.map(beat => `
-    <div class="beat-card" data-beat-id="${beat.id}">
-      <div class="beat-card-art">
-        <img src="${beat.artwork}" alt="${beat.title}" />
-        ${beat.featured ? '<span class="featured-badge">🔥</span>' : ''}
-      </div>
-      <div class="beat-card-info">
-        <div class="beat-card-title">${beat.title}</div>
-        <div class="beat-card-artist">${beat.artist}</div>
-      </div>
-      <div class="beat-card-actions">
-        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
-        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
-          <i class="fas fa-heart"></i>
-        </button>
-      </div>
+  <div class="beat-card" data-beat-id="${beat.id}">
+    <div class="beat-card-art">
+      <img src="${beat.artwork}" alt="${beat.title}" />
+      ${beat.featured ? '<span class="featured-badge">🔥</span>' : ''}
     </div>
-  `).join('');
+    <div class="beat-card-info">
+      <div class="beat-card-title">${beat.title}</div>
+      <div class="beat-card-artist">${beat.artist}</div>
+    </div>
+    <div class="beat-card-actions">
+      <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
+      <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
+        $19.99
+      </button>
+      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+        <i class="fas fa-heart"></i>
+      </button>
+    </div>
+  </div>
+`).join('');
   
   // Add event listeners
   attachBeatCardEvents();
@@ -1595,23 +1594,25 @@ function renderSamples() {
   }
   
   grid.innerHTML = samples.map(beat => `
-    <div class="beat-card" data-beat-id="${beat.id}">
-      <div class="beat-card-art">
-        <img src="${beat.artwork}" alt="${beat.title}" />
-      </div>
-      <div class="beat-card-info">
-        <div class="beat-card-title">${beat.title}</div>
-        <div class="beat-card-artist">${beat.artist}</div>
-      </div>
-      <div class="beat-card-actions">
-        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
-        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
-          <i class="fas fa-heart"></i>
-        </button>
-      </div>
+  <div class="beat-card" data-beat-id="${beat.id}">
+    <div class="beat-card-art">
+      <img src="${beat.artwork}" alt="${beat.title}" />
     </div>
-  `).join('');
+    <div class="beat-card-info">
+      <div class="beat-card-title">${beat.title}</div>
+      <div class="beat-card-artist">${beat.artist}</div>
+    </div>
+    <div class="beat-card-actions">
+      <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
+      <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
+        $19.99
+      </button>
+      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+        <i class="fas fa-heart"></i>
+      </button>
+    </div>
+  </div>
+`).join('');
   
   attachBeatCardEvents();
 }
@@ -1670,6 +1671,14 @@ function attachBeatCardEvents() {
       addToCart(beatId);
     });
   });
+
+document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const beatId = parseInt(btn.dataset.beatId);
+    handleBuy(beatId);
+  });
+});
   
   document.querySelectorAll('.beat-card .like-sm').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1693,121 +1702,75 @@ function attachBeatCardEvents() {
 }
 
 // =============================================================
-// 💳 STRIPE PAYMENT
+// 💰 FIXED PRICE CHECKOUT ($19.99)
 // =============================================================
 
-function showPricePicker(beat) {
+function handleBuy(beatId) {
+  const beat = getBeat(beatId);
+  if (!beat) {
+    showToast('Beat not found', 'fa-exclamation-circle');
+    return;
+  }
+
+  if (!isLoggedIn()) {
+    showToast('Please sign in to purchase', 'fa-sign-in-alt');
+    showAuthModal();
+    return;
+  }
+
+  // Check if user already purchased this beat
+  const alreadyPurchased = state.purchases.some(p => p.beat_id === beatId);
+  if (alreadyPurchased) {
+    showToast('You already own this beat!', 'fa-check-circle');
+    return;
+  }
+
+  // Show checkout modal with fixed price
+  showCheckoutModal(beat);
+}
+
+function showCheckoutModal(beat) {
   const modalBox = document.getElementById('modalBox');
   if (!modalBox) return;
 
   modalBox.innerHTML = `
-    <h2>Pay What You Want</h2>
-    <p class="sub">Choose your price for "${beat.title}"</p>
+    <h2>Purchase License</h2>
+    <p class="sub">You're about to purchase a license for "${beat.title}"</p>
     
-    <div style="text-align:center;margin:20px 0;">
-      <div style="font-size:48px;font-weight:800;color:var(--accent);" id="priceDisplay">$5.00</div>
-      <input type="range" id="priceSlider" min="1" max="50" step="0.50" value="5" 
-        style="width:100%;margin:12px 0;" />
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
-        <span>$1.00</span>
-        <span>$50.00</span>
-      </div>
+    <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
+      <div style="font-size:48px;font-weight:800;color:var(--accent);">$19.99</div>
+      <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
-    <button class="btn-primary" id="checkoutBtn">
-      <i class="fas fa-lock"></i> Pay $5.00
+    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;font-size:13px;color:var(--text-secondary);">
+      <input type="checkbox" id="termsCheckbox" style="width:18px;height:18px;accent-color:var(--accent);" />
+      <label for="termsCheckbox">I agree to the <a href="#" style="color:var(--accent);text-decoration:underline;">Terms & Conditions</a></label>
+    </div>
+
+    <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
+      <i class="fas fa-lock"></i> Pay $19.99
     </button>
-    <button class="btn-secondary" id="cancelCheckout">Cancel</button>
+    <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
+      Cancel
+    </button>
   `;
-
-  const slider = document.getElementById('priceSlider');
-  const display = document.getElementById('priceDisplay');
-  const checkoutBtn = document.getElementById('checkoutBtn');
-
-  slider.addEventListener('input', () => {
-    const price = parseFloat(slider.value);
-    display.textContent = '$' + price.toFixed(2);
-    checkoutBtn.innerHTML = '<i class="fas fa-lock"></i> Pay $' + price.toFixed(2);
-  });
 
   document.getElementById('cancelCheckout').addEventListener('click', () => {
     document.getElementById('modalOverlay').classList.remove('active');
   });
 
-  checkoutBtn.addEventListener('click', async () => {
-    const price = parseFloat(slider.value);
-    await processPayment(beat, price);
+  document.getElementById('checkoutBtn').addEventListener('click', async () => {
+    const termsCheckbox = document.getElementById('termsCheckbox');
+    if (!termsCheckbox.checked) {
+      showToast('Please agree to the Terms & Conditions', 'fa-exclamation-circle');
+      return;
+    }
+
+    await processPayment(beat, 19.99);
   });
 
   document.getElementById('modalOverlay').classList.add('active');
 }
-
-async function processPayment(beat, price) {
-  if (!isLoggedIn()) {
-    showToast('Please sign in first', 'fa-sign-in-alt');
-    showAuthModal();
-    return;
-  }
-
-  try {
-    showToast('Processing...', 'fa-spinner fa-spin');
-    
-    // For now, just show success (Stripe integration coming next)
-    showToast('Payment successful! Check your email.', 'fa-check-circle');
-    document.getElementById('modalOverlay').classList.remove('active');
-    
-    // Save purchase to Supabase
-    const { error } = await supabase
-      .from('purchases')
-      .insert({
-        member_id: state.user.id,
-        beat_id: beat.id,
-        price: price,
-        download_token: 'test-token-' + Date.now(),
-        purchased_at: new Date().toISOString()
-      });
-      
-    if (error) {
-      console.error('Save error:', error);
-    }
-    
-  } catch (error) {
-    showToast('Payment failed: ' + error.message, 'fa-exclamation-circle');
-  }
-}
-  
-  // =============================================================
-  // 🚀 INIT
-  // =============================================================
-  async function init() {
-    console.log('=== INIT STARTING ===');
-    
-    if (supabase) {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          state.user = data.session.user;
-          state.isGuest = false;
-          await loadUserData();
-          updateUI();
-        }
-      } catch (e) {
-        console.warn('Supabase session check failed:', e);
-      }
-    }
-
-    await loadBeatData();
-
-    const overlay = document.getElementById('onboardingOverlay');
-    if (overlay) {
-      overlay.classList.add('active');
-      document.getElementById('onboardingStart')?.addEventListener('click', () => {
-        overlay.classList.remove('active');
-      });
-    }
-
-    console.log('=== INIT COMPLETE ===');
-  }
 
   // =============================================================
   // 🧭 NAVIGATION EVENTS
@@ -1883,7 +1846,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     });
     document.getElementById('buyBtn')?.addEventListener('click', () => {
   if (state.currentBeat) {
-    showPricePicker(state.currentBeat);
+    handleBuy(state.currentBeat.id);
   }
 });
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
