@@ -1451,8 +1451,36 @@ function closeFullPlayer() {
   const overlay = document.getElementById('fullPlayerOverlay');
   if (overlay) {
     overlay.classList.remove('active');
+    // Also pause the audio when closing
+    const audio = document.getElementById('audioPlayer');
+    if (audio && state.isPlaying) {
+      audio.pause();
+      state.isPlaying = false;
+      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    }
   }
 }
+
+// Remove ALL existing close button event listeners and add this single one:
+// Make sure this runs after the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // ... other code ...
+  
+  // CLOSE BUTTON - Single clean listener
+  const closeBtn = document.getElementById('fullPlayerClose');
+  if (closeBtn) {
+    // Remove any existing listeners by cloning
+    const newCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    
+    // Add the new listener
+    newCloseBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeFullPlayer();
+    });
+  }
+});
 
 function syncFullPlayer() {
   const beat = state.currentBeat;
@@ -1504,9 +1532,6 @@ function syncFullPlayer() {
 // =============================================================
 // FULL PLAYER EVENT LISTENERS
 // =============================================================
-
-// CLOSE BUTTON - This is what you need!
-document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
 
 // Play/Pause button
 document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
@@ -1589,8 +1614,6 @@ document.getElementById('audioPlayer')?.addEventListener('timeupdate', function(
 // FULL PLAYER EVENT LISTENERS
 // =============================================================
 
-// Close button
-document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
 
 // Swipe down to close
 const fullPlayerOverlay = document.getElementById('fullPlayerOverlay');
@@ -2227,8 +2250,12 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     init();
     console.log('MarcDBeats v7 loaded!');
   });
-</script>
+
   
+</script>
+
+
+    
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     :root {
