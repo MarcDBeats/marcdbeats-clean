@@ -2079,8 +2079,9 @@ function showCheckoutModal(beat) {
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
 
     document.getElementById('spotifyPlayer')?.addEventListener('click', (e) => {
-  // Don't open if clicking on buttons
+  // Don't open if clicking on buttons OR if the full player is already open
   if (e.target.closest('button')) return;
+  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) return;
   if (state.currentBeat) {
     openFullPlayer();
     syncFullPlayer();
