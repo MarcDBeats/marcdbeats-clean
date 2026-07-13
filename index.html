@@ -1780,63 +1780,88 @@ function renderSync() {
   `).join('');
   
   attachBeatCardEvents();
-}
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
-// This code runs when you click the PLAY button on a beat card
-document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
-  btn.addEventListener('click', function(e) {
-    e.stopPropagation();  // Don't trigger the card click too
-    
-    const beatId = parseInt(this.dataset.beatId);
-    const beat = getBeat(beatId);
-    if (beat) {
-      const index = state.beats.indexOf(beat);
-      renderCard(beat, index, state.beats);  // This now updates everything!
-    }
-  });
-});
-
-document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const beatId = parseInt(btn.dataset.beatId);
-    handleBuy(beatId);
-  });
-});
+  console.log('🎯 Attaching beat card events...');
   
-  document.querySelectorAll('.beat-card .like-sm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // 1. PLAY BUTTON - when you click the play icon
+  document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();  // Stop the card click from also firing
+      e.preventDefault();
+      
+      const beatId = parseInt(this.dataset.beatId);
+      const beat = getBeat(beatId);
+      if (beat) {
+        const index = state.beats.indexOf(beat);
+        console.log('▶️ Playing beat:', beat.title);
+        renderCard(beat, index, state.beats);
+      } else {
+        console.warn('⚠️ Beat not found for ID:', beatId);
+      }
+    });
+  });
+
+  // 2. BUY BUTTON
+  document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
+    btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      const beatId = parseInt(btn.dataset.beatId);
-      toggleLike(beatId);
-      btn.classList.toggle('liked');
+      e.preventDefault();
+      
+      const beatId = parseInt(this.dataset.beatId);
+      console.log('🛒 Buy button clicked for beat ID:', beatId);
+      handleBuy(beatId);
     });
   });
   
+  // 3. LIKE BUTTON
+  document.querySelectorAll('.beat-card .like-sm').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      const beatId = parseInt(this.dataset.beatId);
+      toggleLike(beatId);
+      this.classList.toggle('liked');
+    });
+  });
+  
+  // 4. CART BUTTON (only in Sync tab)
+  document.querySelectorAll('.beat-card .cart-sm').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      const beatId = parseInt(this.dataset.beatId);
+      addToCart(beatId);
+    });
+  });
+  
+  // 5. BEAT CARD CLICK - when you click anywhere on the card
   document.querySelectorAll('.beat-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const beatId = parseInt(card.dataset.beatId);
-    const beat = getBeat(beatId);
-    if (beat) {
-      const index = state.beats.indexOf(beat);
-      renderCard(beat, index, state.beats);
-    }
+    // Remove any existing listeners to prevent duplicates
+    card.removeEventListener('click', card._clickHandler);
+    
+    // Create the handler
+    card._clickHandler = function(e) {
+      // Ignore clicks on buttons inside the card
+      if (e.target.closest('button')) return;
+      
+      const beatId = parseInt(this.dataset.beatId);
+      const beat = getBeat(beatId);
+      if (beat) {
+        const index = state.beats.indexOf(beat);
+        console.log('🎵 Card clicked - playing:', beat.title);
+        renderCard(beat, index, state.beats);
+      }
+    };
+    
+    // Add the listener
+    card.addEventListener('click', card._clickHandler);
   });
-});
-
-  // Beat card click - plays audio
-document.querySelectorAll('.beat-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const beatId = parseInt(card.dataset.beatId);
-    const beat = getBeat(beatId);
-    if (beat) {
-      const index = state.beats.indexOf(beat);
-      renderCard(beat, index, state.beats);
-    }
-  });
-});
+  
+  console.log('✅ Beat card events attached!');
 }
 
 // =============================================================
