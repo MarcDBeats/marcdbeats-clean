@@ -499,44 +499,28 @@ state.playlists = playlistIds.map(id => {
   // 🎬 RENDER CARD (SINGLE VERSION - FIXED)
   // =============================================================
 function renderCard(beat, index, queue) {
+  if (!beat) {
+    console.error('No beat provided to renderCard');
+    return;
+  }
+  
+  console.log('🎵 renderCard called for:', beat.title);
+  
   // Remember what's playing
   state.playerQueue = queue || state.beats;
   state.currentIndex = index;
   state.currentBeat = beat;
   
-  // Update the bottom player
-  updateBottomPlayer(beat);
-  updateFullPlayer(beat);
-  
-  // Load and play the audio
-  const audio = document.getElementById('audioPlayer');
-  if (audio && beat.mp3) {
-    audio.src = beat.mp3;
-    audio.load();
-    
-    audio.play().catch(err => {
-      console.warn('Autoplay blocked:', err);
-      state.isPlaying = false;
-      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    });
-    
-    state.isPlaying = true;
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-  }
-}
-
-  // This updates the bottom player (the one at the bottom of the screen)
-function updateBottomPlayer(beat) {
-  if (!beat) return;
-  
-  // Update the title and artist
+  // UPDATE THE BOTTOM PLAYER
+  // Update title
   const titleEl = document.getElementById('playerTitle');
-  const artistEl = document.getElementById('playerArtist');
   if (titleEl) titleEl.textContent = beat.title;
+  
+  // Update artist
+  const artistEl = document.getElementById('playerArtist');
   if (artistEl) artistEl.textContent = beat.artist;
   
-  // Update the artwork (the picture)
+  // Update artwork
   const artwork = document.getElementById('playerArtwork');
   if (artwork) {
     if (beat.artwork) {
@@ -546,49 +530,69 @@ function updateBottomPlayer(beat) {
     }
   }
   
-  // Update the like button (heart icon)
-  const liked = isLiked(beat.id);
-  const likeBtn = document.getElementById('playerLike');
-  if (likeBtn) {
-    if (liked) {
-      likeBtn.classList.add('liked');
-      likeBtn.style.color = '#22c55e';
-    } else {
-      likeBtn.classList.remove('liked');
-      likeBtn.style.color = 'var(--text-muted)';
-    }
-  }
-}
-
-// This updates the full player (the big one that pops up)
-function updateFullPlayer(beat) {
-  if (!beat) return;
+  // Update FULL PLAYER
+  const fullTitle = document.getElementById('fullPlayerTitle');
+  if (fullTitle) fullTitle.textContent = beat.title;
   
-  // Update title and artist in full player
-  document.getElementById('fullPlayerTitle').textContent = beat.title;
-  document.getElementById('fullPlayerArtist').textContent = beat.artist;
+  const fullArtist = document.getElementById('fullPlayerArtist');
+  if (fullArtist) fullArtist.textContent = beat.artist;
   
-  // Update artwork in full player
-  const artwork = document.getElementById('fullPlayerArtwork');
-  if (artwork) {
+  const fullArtwork = document.getElementById('fullPlayerArtwork');
+  if (fullArtwork) {
     if (beat.artwork) {
-      artwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
+      fullArtwork.innerHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
     } else {
-      artwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
+      fullArtwork.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;"><i class="fas fa-music"></i></div>`;
     }
   }
   
-  // Update like button in full player
+  // UPDATE LIKE BUTTONS
   const liked = isLiked(beat.id);
-  const likeBtn = document.getElementById('fullPlayerLike');
-  if (likeBtn) {
+  
+  const playerLike = document.getElementById('playerLike');
+  if (playerLike) {
     if (liked) {
-      likeBtn.classList.add('liked');
-      likeBtn.style.color = '#22c55e';
+      playerLike.style.color = '#22c55e';
     } else {
-      likeBtn.classList.remove('liked');
-      likeBtn.style.color = 'var(--text-muted)';
+      playerLike.style.color = 'var(--text-muted)';
     }
+  }
+  
+  const fullLike = document.getElementById('fullPlayerLike');
+  if (fullLike) {
+    if (liked) {
+      fullLike.style.color = '#22c55e';
+    } else {
+      fullLike.style.color = 'var(--text-muted)';
+    }
+  }
+  
+  // LOAD AND PLAY AUDIO
+  const audio = document.getElementById('audioPlayer');
+  if (audio && beat.mp3) {
+    console.log('🎵 Loading MP3:', beat.mp3);
+    audio.src = beat.mp3;
+    audio.load();
+    
+    // Try to play
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('✅ Audio playing');
+          state.isPlaying = true;
+          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        })
+        .catch(err => {
+          console.warn('⚠️ Autoplay blocked:', err);
+          state.isPlaying = false;
+          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+        });
+    }
+  } else {
+    console.warn('⚠️ No MP3 for beat:', beat.title);
   }
 }
 
