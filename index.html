@@ -1558,8 +1558,8 @@ function renderBeatStore() {
   </div>
 `).join('');
   
-  // Add event listeners
-  attachBeatCardEvents();
+  // Add event listeners with a tiny delay
+setTimeout(attachBeatCardEvents, 50);
 }
 
 function renderBeatTapes() {
