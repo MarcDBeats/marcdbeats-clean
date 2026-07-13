@@ -981,17 +981,17 @@ artwork.innerHTML = `<video src="${beat.video}" muted loop playsinline controlsl
     `).join('');
 
     tracklist.querySelectorAll('.track-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
-        const beatId = parseInt(item.dataset.beatId);
-        const beat = getBeat(beatId);
-        if (beat) {
-          closeAllViews();
-          switchTab('discover');
-          renderDiscover(state.beats.indexOf(beat));
-        }
-      });
-    });
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    const beatId = parseInt(item.dataset.beatId);
+    const beat = getBeat(beatId);
+    if (beat) {
+      closeAllViews();
+      switchTab('discover');
+      renderDiscover(state.beats.indexOf(beat));
+    }
+  });
+});
 
     tracklist.querySelectorAll('.like-btn-track').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1733,15 +1733,15 @@ document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
   });
   
   document.querySelectorAll('.beat-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const beatId = parseInt(card.dataset.beatId);
-      const beat = getBeat(beatId);
-      if (beat) {
-        const index = state.beats.indexOf(beat);
-        renderCard(beat, index, state.beats);
-      }
-    });
+  card.addEventListener('click', () => {
+    const beatId = parseInt(card.dataset.beatId);
+    const beat = getBeat(beatId);
+    if (beat) {
+      const index = state.beats.indexOf(beat);
+      renderCard(beat, index, state.beats);
+    }
   });
+});
 }
 
 // =============================================================
@@ -1962,16 +1962,17 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
 
     document.getElementById('playerCart')?.addEventListener('click', renderCartModal);
 
-    document.getElementById('searchBtn')?.addEventListener('click', () => {
-      const query = document.getElementById('searchInput')?.value;
-      if (query) searchBeats(query);
-    });
-    document.getElementById('searchInput')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const query = document.getElementById('searchInput')?.value;
-        if (query) searchBeats(query);
-      }
-    });
+    // Beat Store Search (new)
+document.getElementById('beatSearchBtn')?.addEventListener('click', () => {
+  const query = document.getElementById('beatSearchInput')?.value;
+  if (query) searchBeats(query);
+});
+document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const query = document.getElementById('beatSearchInput')?.value;
+    if (query) searchBeats(query);
+  }
+});
 
     document.addEventListener('keydown', (e) => {
       if (document.getElementById('modalOverlay')?.classList.contains('active')) return;
@@ -3043,24 +3044,13 @@ button:active {
   </div>
 </header>
 
-  <div class="search-container">
-    <i class="fas fa-search"></i>
-    <input type="text" id="searchInput" placeholder="Search beats or paste social media link..." />
-    <button class="search-btn" id="searchBtn"><i class="fas fa-arrow-right"></i></button>
-  </div>
+
 
   <div class="tab-nav" id="tabNav">
   <button class="active" data-tab="beatstore">Beat Store</button>
   <button data-tab="beattapes">Beat Tapes</button>
   <button data-tab="samples">Samples</button>
   <button data-tab="sync">Sync</button>
-</div>
-
-  <!-- Filter Row -->
-<div class="filter-row" id="filterRow">
-  <button class="filter-btn active" data-filter="all">All</button>
-  <button class="filter-btn" data-filter="recent">Recent</button>
-  <button class="filter-btn" data-filter="featured">Featured</button>
 </div>
 
 <div class="content-area">
@@ -3070,8 +3060,16 @@ button:active {
     
     <!-- Beat Store Tab -->
     <div class="tab-content active" id="beatstoreContent">
-      <div class="beat-grid" id="beatStoreGrid"></div>
-    </div>
+  <!-- Search Bar -->
+  <div class="beatstore-search" style="display:flex;align-items:center;background:rgba(255,255,255,0.06);border-radius:30px;border:1px solid var(--border-subtle);padding:0 16px;margin-bottom:12px;transition:0.3s;">
+    <i class="fas fa-search" style="color:var(--text-muted);font-size:14px;"></i>
+    <input type="text" id="beatSearchInput" placeholder="Search beats..." style="flex:1;background:transparent;border:none;padding:10px 12px;color:var(--text-primary);font-size:14px;outline:none;min-width:0;" />
+    <button class="beat-search-btn" id="beatSearchBtn" style="background:var(--gradient-1);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;transition:0.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
+      <i class="fas fa-arrow-right"></i>
+    </button>
+  </div>
+  <div class="beat-grid" id="beatStoreGrid"></div>
+</div>
     
     <!-- Beat Tapes Tab -->
     <div class="tab-content" id="beattapesContent">
