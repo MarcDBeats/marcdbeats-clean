@@ -1505,6 +1505,90 @@ function syncFullPlayer() {
 // FULL PLAYER EVENT LISTENERS
 // =============================================================
 
+// CLOSE BUTTON - This is what you need!
+document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
+
+// Play/Pause button
+document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
+  const audio = document.getElementById('audioPlayer');
+  if (!audio || !audio.src) {
+    showToast('No audio available', 'fa-exclamation-circle');
+    return;
+  }
+  
+  if (state.isPlaying) {
+    audio.pause();
+    state.isPlaying = false;
+    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+  } else {
+    audio.play().catch(e => console.warn('Playback failed:', e));
+    state.isPlaying = true;
+    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+  }
+});
+
+// Previous button
+document.getElementById('fullPlayerPrev')?.addEventListener('click', function() {
+  prevBeat();
+  setTimeout(syncFullPlayer, 100);
+});
+
+// Next button
+document.getElementById('fullPlayerNext')?.addEventListener('click', function() {
+  nextBeat();
+  setTimeout(syncFullPlayer, 100);
+});
+
+// Like button
+document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
+  if (!isLoggedIn()) {
+    showToast('Please sign in to like beats ❤️', 'fa-sign-in-alt');
+    showAuthModal();
+    return;
+  }
+  if (state.currentBeat) {
+    toggleLike(state.currentBeat.id);
+    const likeBtn = document.getElementById('fullPlayerLike');
+    if (likeBtn) {
+      const liked = isLiked(state.currentBeat.id);
+      likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+      likeBtn.classList.toggle('liked', liked);
+    }
+  }
+});
+
+// Add to Cart button
+document.getElementById('fullPlayerAddToCart')?.addEventListener('click', function() {
+  if (state.currentBeat) {
+    addToCart(state.currentBeat.id);
+  }
+});
+
+// Cart button
+document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
+
+// Progress bar
+document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
+  const audio = document.getElementById('audioPlayer');
+  if (!isNaN(audio.duration) && audio.duration > 0) {
+    const seekTime = (parseFloat(this.value) / 100) * audio.duration;
+    audio.currentTime = seekTime;
+    document.getElementById('fullTimeCurrent').textContent = formatTime(seekTime);
+  }
+});
+
+// Sync full player with audio updates
+document.getElementById('audioPlayer')?.addEventListener('timeupdate', function() {
+  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) {
+    syncFullPlayer();
+  }
+});
+// =============================================================
+// FULL PLAYER EVENT LISTENERS
+// =============================================================
+
 // Close button
 document.getElementById('fullPlayerClose')?.addEventListener('click', closeFullPlayer);
 
