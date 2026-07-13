@@ -1353,6 +1353,11 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     }
 
     await loadBeatData();
+    const firstFeatured = state.beats.find(b => b.featured === true);
+if (firstFeatured) {
+  const index = state.beats.indexOf(firstFeatured);
+  renderCard(firstFeatured, index, state.beats);
+}
 
     const overlay = document.getElementById('onboardingOverlay');
     if (overlay) {
