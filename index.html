@@ -604,7 +604,7 @@ function renderCard(beat, index, queue) {
   if (!playlistBeats) {
     playlistBeats = state.beats
       .filter(b => b.featured === true)
-      .sort((a, b) => (a.order || 999) - (b.order || 999));
+      .sort((a, b) => (a.Order || 999) - (b.Order || 999));
   }
   
   if (playlistBeats.length === 0) return;
@@ -635,7 +635,7 @@ function renderCard(beat, index, queue) {
   if (!playlistBeats) {
     playlistBeats = state.beats
       .filter(b => b.featured === true)
-      .sort((a, b) => (a.order || 999) - (b.order || 999));
+      .sort((a, b) => (a.Order || 999) - (b.Order || 999));
   }
   
   if (playlistBeats.length === 0) return;
