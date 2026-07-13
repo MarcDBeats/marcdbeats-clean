@@ -1375,9 +1375,14 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
       }
     }
 
-    await loadBeatData();
-const firstFeatured = state.beats.find(b => b.featured === true);
-if (firstFeatured) {
+await loadBeatData();
+// Get featured beats sorted by Order field
+const featuredSorted = state.beats
+  .filter(b => b.featured === true)
+  .sort((a, b) => (a.Order || 999) - (b.Order || 999));
+
+if (featuredSorted.length > 0) {
+  const firstFeatured = featuredSorted[0];
   const index = state.beats.indexOf(firstFeatured);
   renderCard(firstFeatured, index, state.beats);
   // Auto-play the audio
