@@ -532,17 +532,44 @@ state.playlists = playlistIds.map(id => {
     updatePlayer(beat);
     
         const audio = document.getElementById('audioPlayer');
-    if (audio && beat.mp3) {
-      // Reset progress bar for new beat
-      const progressSlider = document.getElementById('progressSlider');
-      const timeCurrent = document.getElementById('timeCurrent');
-      const timeTotal = document.getElementById('timeTotal');
-      if (progressSlider) progressSlider.value = 0;
-      if (timeCurrent) timeCurrent.textContent = '0:00';
-      if (timeTotal) timeTotal.textContent = '0:00';
-      
-      audio.play().catch(err => console.log('Audio autoplay blocked:', err));
+if (audio) {
+  if (beat.mp3) {
+    console.log('🎵 Loading MP3:', beat.mp3);
+    audio.src = beat.mp3;
+    audio.load();
+    
+    // Reset progress bar
+    const progressSlider = document.getElementById('progressSlider');
+    const timeCurrent = document.getElementById('timeCurrent');
+    const timeTotal = document.getElementById('timeTotal');
+    if (progressSlider) progressSlider.value = 0;
+    if (timeCurrent) timeCurrent.textContent = '0:00';
+    if (timeTotal) timeTotal.textContent = '0:00';
+    
+    // Try to play
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('✅ Audio playing');
+          state.isPlaying = true;
+          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        })
+        .catch(err => {
+          console.warn('⚠️ Autoplay blocked:', err);
+          // User needs to click play manually
+          state.isPlaying = false;
+          document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+          document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+          showToast('Tap play to start audio', 'fa-play');
+        });
     }
+  } else {
+    console.warn('⚠️ No MP3 found for beat:', beat.title);
+    showToast('No audio available for this beat', 'fa-exclamation-circle');
+  }
+}
   }
 
   // =============================================================
@@ -3045,7 +3072,7 @@ button:active {
 </div>
 
   <div class="spotify-player" id="spotifyPlayer">
-  <audio id="audioPlayer" style="display:none;"></audio>
+  <audio id="audioPlayer" style="display:none;" preload="metadata"></audio>
 
     
   
