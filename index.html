@@ -1726,80 +1726,69 @@ function renderSync() {
 function attachBeatCardEvents() {
   console.log('🎯 Attaching beat card events...');
   
-  // 1. PLAY BUTTON - when you click the play icon
-  document.querySelectorAll('.beat-card .play-sm').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();  // Stop the card click from also firing
-      e.preventDefault();
-      
-      const beatId = parseInt(this.dataset.beatId);
-      const beat = getBeat(beatId);
-      if (beat) {
-        const index = state.beats.indexOf(beat);
-        console.log('▶️ Playing beat:', beat.title);
-        renderCard(beat, index, state.beats);
-      } else {
-        console.warn('⚠️ Beat not found for ID:', beatId);
-      }
-    });
-  });
-
-  // 2. BUY BUTTON
-  document.querySelectorAll('.beat-card .buy-sm').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      const beatId = parseInt(this.dataset.beatId);
-      console.log('🛒 Buy button clicked for beat ID:', beatId);
-      handleBuy(beatId);
-    });
-  });
-  
-  // 3. LIKE BUTTON
-  document.querySelectorAll('.beat-card .like-sm').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      const beatId = parseInt(this.dataset.beatId);
-      toggleLike(beatId);
-      this.classList.toggle('liked');
-    });
-  });
-  
-  // 4. CART BUTTON (only in Sync tab)
-  document.querySelectorAll('.beat-card .cart-sm').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      const beatId = parseInt(this.dataset.beatId);
-      addToCart(beatId);
-    });
-  });
-  
-  // 5. BEAT CARD CLICK - when you click anywhere on the card
+  // Remove any old listeners to prevent duplicates
   document.querySelectorAll('.beat-card').forEach(card => {
-    // Remove any existing listeners to prevent duplicates
-    card.removeEventListener('click', card._clickHandler);
+    card.replaceWith(card.cloneNode(true));
+  });
+  
+  // Re-query after clone
+  document.querySelectorAll('.beat-card').forEach(card => {
+    const beatId = parseInt(card.dataset.beatId);
     
-    // Create the handler
-    card._clickHandler = function(e) {
-      // Ignore clicks on buttons inside the card
+    // CARD CLICK - click anywhere on the card
+    card.addEventListener('click', function(e) {
+      // Ignore clicks on buttons
       if (e.target.closest('button')) return;
       
-      const beatId = parseInt(this.dataset.beatId);
       const beat = getBeat(beatId);
       if (beat) {
         const index = state.beats.indexOf(beat);
         console.log('🎵 Card clicked - playing:', beat.title);
         renderCard(beat, index, state.beats);
       }
-    };
+    });
     
-    // Add the listener
-    card.addEventListener('click', card._clickHandler);
+    // PLAY BUTTON
+    const playBtn = card.querySelector('.play-sm');
+    if (playBtn) {
+      playBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const beat = getBeat(beatId);
+        if (beat) {
+          const index = state.beats.indexOf(beat);
+          console.log('▶️ Play button clicked - playing:', beat.title);
+          renderCard(beat, index, state.beats);
+        }
+      });
+    }
+    
+    // BUY BUTTON
+    const buyBtn = card.querySelector('.buy-sm');
+    if (buyBtn) {
+      buyBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        handleBuy(beatId);
+      });
+    }
+    
+    // LIKE BUTTON
+    const likeBtn = card.querySelector('.like-sm');
+    if (likeBtn) {
+      likeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleLike(beatId);
+        likeBtn.classList.toggle('liked');
+      });
+    }
+    
+    // CART BUTTON (for sync tab)
+    const cartBtn = card.querySelector('.cart-sm');
+    if (cartBtn) {
+      cartBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        addToCart(beatId);
+      });
+    }
   });
   
   console.log('✅ Beat card events attached!');
