@@ -499,91 +499,30 @@ state.playlists = playlistIds.map(id => {
   // 🎬 RENDER CARD (SINGLE VERSION - FIXED)
   // =============================================================
 function renderCard(beat, index, queue) {
-  // Update the player at the bottom
-  updateBottomPlayer(beat);
-  updateFullPlayer(beat);
-  
-  // Load and play audio
-  const audio = document.getElementById('audioPlayer');
-  if (audio && beat.mp3) {
-    audio.src = beat.mp3;
-    audio.load();
-    audio.play().catch(e => console.log('Playback failed:', e));
-    state.isPlaying = true;
-  }
-  
-  // Show the beat artwork
-  const hasArtwork = beat.artwork && beat.artwork.length > 0;
-  let mediaHTML = '';
-  if (hasArtwork) {
-    mediaHTML = `<img src="${beat.artwork}" alt="${beat.title}" style="width:100%;height:100%;object-fit:cover;" />`;
-  } else {
-    mediaHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-muted);font-size:64px;">🎵</div>`;
-  }
-  
-  // Show the card
-  container.innerHTML = `
-    <div style="width:100%;height:85%;position:relative;border-radius:20px;overflow:hidden;background:var(--bg-card);box-shadow:0 10px 40px rgba(0,0,0,0.5);margin:0 auto;">
-      <div style="width:100%;height:100%;overflow:hidden;background:var(--bg-card-hover);">
-        ${mediaHTML}
-      </div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:45%;background:linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);pointer-events:none;z-index:5;"></div>
-      <div style="position:absolute;bottom:20px;left:24px;right:24px;z-index:2;pointer-events:none;">
-        <h2 style="font-size:24px;font-weight:700;margin-bottom:4px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.title}</h2>
-        <p style="color:var(--text-secondary);font-size:16px;margin-bottom:2px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.artist}</p>
-        <p style="color:var(--text-muted);font-size:13px;text-shadow:0 2px 12px rgba(0,0,0,0.6);pointer-events:auto;">${beat.genre}</p>
-      </div>
-    </div>
-  `;
-  
   // Remember what's playing
   state.playerQueue = queue || state.beats;
   state.currentIndex = index;
   state.currentBeat = beat;
   
-  // 👇 THIS IS THE NEW IMPORTANT PART 👇
-  // Update the bottom player AND the big player
-  updateBottomPlayer(beat);  // <-- New function!
-  updateFullPlayer(beat);   // <-- New function!
+  // Update the bottom player
+  updateBottomPlayer(beat);
+  updateFullPlayer(beat);
   
   // Load and play the audio
   const audio = document.getElementById('audioPlayer');
-  if (audio) {
-    if (beat.mp3) {
-      console.log('🎵 Loading MP3:', beat.mp3);
-      audio.src = beat.mp3;
-      audio.load();
-      
-      // Reset progress bar
-      const progressSlider = document.getElementById('progressSlider');
-      const timeCurrent = document.getElementById('timeCurrent');
-      const timeTotal = document.getElementById('timeTotal');
-      if (progressSlider) progressSlider.value = 0;
-      if (timeCurrent) timeCurrent.textContent = '0:00';
-      if (timeTotal) timeTotal.textContent = '0:00';
-      
-      // Try to play
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('✅ Audio playing');
-            state.isPlaying = true;
-            document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-            document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-          })
-          .catch(err => {
-            console.warn('⚠️ Autoplay blocked:', err);
-            state.isPlaying = false;
-            document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-            document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
-            showToast('Tap play to start audio', 'fa-play');
-          });
-      }
-    } else {
-      console.warn('⚠️ No MP3 found for beat:', beat.title);
-      showToast('No audio available for this beat', 'fa-exclamation-circle');
-    }
+  if (audio && beat.mp3) {
+    audio.src = beat.mp3;
+    audio.load();
+    
+    audio.play().catch(err => {
+      console.warn('Autoplay blocked:', err);
+      state.isPlaying = false;
+      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+    });
+    
+    state.isPlaying = true;
+    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
   }
 }
 
