@@ -433,7 +433,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     // Shuffle beats for random order
     state.featured = state.beats
   .filter(b => b.featured === true)
-  .sort((a, b) => (a.order || 999) - (b.order || 999));
+  .sort((a, b) => (a.Order || 999) - (b.Order || 999));
     state.singles = state.beats.filter(beat => beat.isSingle === true);
 
     const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
