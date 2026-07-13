@@ -511,16 +511,13 @@ function renderCard(beat, index, queue) {
   state.currentIndex = index;
   state.currentBeat = beat;
   
-  // UPDATE THE BOTTOM PLAYER
-  // Update title
+  // UPDATE BOTTOM PLAYER
   const titleEl = document.getElementById('playerTitle');
   if (titleEl) titleEl.textContent = beat.title;
   
-  // Update artist
   const artistEl = document.getElementById('playerArtist');
   if (artistEl) artistEl.textContent = beat.artist;
   
-  // Update artwork
   const artwork = document.getElementById('playerArtwork');
   if (artwork) {
     if (beat.artwork) {
@@ -530,7 +527,7 @@ function renderCard(beat, index, queue) {
     }
   }
   
-  // Update FULL PLAYER
+  // UPDATE FULL PLAYER
   const fullTitle = document.getElementById('fullPlayerTitle');
   if (fullTitle) fullTitle.textContent = beat.title;
   
@@ -551,20 +548,12 @@ function renderCard(beat, index, queue) {
   
   const playerLike = document.getElementById('playerLike');
   if (playerLike) {
-    if (liked) {
-      playerLike.style.color = '#22c55e';
-    } else {
-      playerLike.style.color = 'var(--text-muted)';
-    }
+    playerLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
   }
   
   const fullLike = document.getElementById('fullPlayerLike');
   if (fullLike) {
-    if (liked) {
-      fullLike.style.color = '#22c55e';
-    } else {
-      fullLike.style.color = 'var(--text-muted)';
-    }
+    fullLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
   }
   
   // LOAD AND PLAY AUDIO
@@ -574,7 +563,6 @@ function renderCard(beat, index, queue) {
     audio.src = beat.mp3;
     audio.load();
     
-    // Try to play
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise
