@@ -498,9 +498,19 @@ state.playlists = playlistIds.map(id => {
   // =============================================================
   // 🎬 RENDER CARD (SINGLE VERSION - FIXED)
   // =============================================================
-  function renderCard(beat, index, queue) {
-  const container = document.getElementById('exploreBeatDisplay');
-  if (!container) return;
+function renderCard(beat, index, queue) {
+  // Update the player at the bottom
+  updateBottomPlayer(beat);
+  updateFullPlayer(beat);
+  
+  // Load and play audio
+  const audio = document.getElementById('audioPlayer');
+  if (audio && beat.mp3) {
+    audio.src = beat.mp3;
+    audio.load();
+    audio.play().catch(e => console.log('Playback failed:', e));
+    state.isPlaying = true;
+  }
   
   // Show the beat artwork
   const hasArtwork = beat.artwork && beat.artwork.length > 0;
