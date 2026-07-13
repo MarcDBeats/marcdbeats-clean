@@ -104,6 +104,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     featured: [],
     loaded: false,
     playerQueue: [],
+    currentPlaylist: 'featured',
     dataLoaded: false
   };
 
@@ -431,7 +432,9 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 }));
     // Shuffle beats for random order
     state.beats = shuffleArray(state.beats);
-    state.featured = state.beats.filter(b => b.featured === true);
+    state.featured = state.beats
+  .filter(b => b.featured === true)
+  .sort((a, b) => (a.order || 999) - (b.order || 999));
     state.singles = state.beats.filter(beat => beat.isSingle === true);
 
     const playlistIds = [...new Set(state.beats.map(b => b.playlist).filter(Boolean))];
@@ -588,40 +591,66 @@ function renderCard(beat, index, queue) {
   // 🔄 NAVIGATION FUNCTIONS
   // =============================================================
   function prevBeat() {
-    let prevIndex = state.currentIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = state.beats.length - 1;
+  let playlistBeats;
+  
+  // If we're in a playlist, use those beats
+  if (state.currentPlaylist !== 'featured') {
+    const playlist = getPlaylist(state.currentPlaylist);
+    if (playlist) {
+      playlistBeats = playlist.beats;
     }
-    const beat = state.beats[prevIndex];
-    renderCard(beat, prevIndex, state.beats);
-    
-    setTimeout(() => {
-      const audio = document.getElementById('audioPlayer');
-      if (audio && beat.mp3) {
-        audio.play().catch(e => console.log('Playback failed:', e));
-        state.isPlaying = true;
-        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-      }
-    }, 300);
   }
+  
+  // Otherwise use featured beats
+  if (!playlistBeats) {
+    playlistBeats = state.beats
+      .filter(b => b.featured === true)
+      .sort((a, b) => (a.order || 999) - (b.order || 999));
+  }
+  
+  if (playlistBeats.length === 0) return;
+  
+  // Find current beat in the list
+  const currentIndex = playlistBeats.findIndex(b => b.id === state.currentBeat?.id);
+  let prevIndex = currentIndex - 1;
+  if (prevIndex < 0) {
+    prevIndex = playlistBeats.length - 1;
+  }
+  
+  const beat = playlistBeats[prevIndex];
+  renderCard(beat, state.beats.indexOf(beat), state.beats);
+}
 
   function nextBeat() {
-    let nextIndex = state.currentIndex + 1;
-    if (nextIndex >= state.beats.length) {
-      nextIndex = 0;
+  let playlistBeats;
+  
+  // If we're in a playlist, use those beats
+  if (state.currentPlaylist !== 'featured') {
+    const playlist = getPlaylist(state.currentPlaylist);
+    if (playlist) {
+      playlistBeats = playlist.beats;
     }
-    const beat = state.beats[nextIndex];
-    renderCard(beat, nextIndex, state.beats);
-    
-    setTimeout(() => {
-      const audio = document.getElementById('audioPlayer');
-      if (audio && beat.mp3) {
-        audio.play().catch(e => console.log('Playback failed:', e));
-        state.isPlaying = true;
-        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-      }
-    }, 300);
   }
+  
+  // Otherwise use featured beats
+  if (!playlistBeats) {
+    playlistBeats = state.beats
+      .filter(b => b.featured === true)
+      .sort((a, b) => (a.order || 999) - (b.order || 999));
+  }
+  
+  if (playlistBeats.length === 0) return;
+  
+  // Find current beat in the list
+  const currentIndex = playlistBeats.findIndex(b => b.id === state.currentBeat?.id);
+  let nextIndex = currentIndex + 1;
+  if (nextIndex >= playlistBeats.length) {
+    nextIndex = 0;
+  }
+  
+  const beat = playlistBeats[nextIndex];
+  renderCard(beat, state.beats.indexOf(beat), state.beats);
+}
 
   // =============================================================
   // 🔄 RENDER DISCOVER (Explore Tab)
@@ -1545,7 +1574,6 @@ function renderBeatStore() {
   <div class="beat-card" data-beat-id="${beat.id}">
     <div class="beat-card-art">
       <img src="${beat.artwork}" alt="${beat.title}" />
-      ${beat.featured ? '<span class="featured-badge">🔥</span>' : ''}
     </div>
     <div class="beat-card-info">
       <div class="beat-card-title">${beat.title}</div>
@@ -1565,6 +1593,7 @@ function renderBeatStore() {
   
   // Add event listeners with a tiny delay
 setTimeout(attachBeatCardEvents, 50);
+  state.currentPlaylist = 'featured';
 }
 
 function renderBeatTapes() {
