@@ -74,9 +74,13 @@
   const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
   const AIRTABLE_TABLE_NAME = 'Beats';
   const BEAT_PRICE = 19.99;           // Standard license price
+
+  // Like / cart UI selector constants — update both CSS classes and these strings together
   const LIKE_BUTTON_SELECTOR = '.like-sm[data-beat-id], .like-btn-track[data-beat-id]';
   const CART_BUTTON_SELECTOR = '.cart-sm[data-beat-id], .cart-btn-track[data-beat-id]';
+  // LIKE_COLOR_ACTIVE must stay in sync with --like-color-active in :root CSS
   const LIKE_COLOR_ACTIVE = '#22c55e'; // green used for active like buttons
+
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
@@ -159,6 +163,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   }
 
   function isLiked(beatId) { return state.likes.includes(beatId); }
+  // Returns the expected liked state after a toggle — used for optimistic UI updates
+  function getToggledLikeState(beatId) { return !isLiked(beatId); }
   function isLoggedIn() { return state.user !== null; }
   function formatPrice(price) { return `$${price.toFixed(2)}`; }
   function formatViews(views) {
@@ -380,7 +386,9 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 
   // Returns all cart buttons on the page for a specific beat
   function getCartButtonsForBeat(beatId) {
-    const selector = CART_BUTTON_SELECTOR.replace(/\[data-beat-id\]/g, `[data-beat-id="${beatId}"]`);
+    const safeId = parseInt(beatId, 10);
+    if (isNaN(safeId)) return [];
+    const selector = CART_BUTTON_SELECTOR.replace(/\[data-beat-id\]/g, `[data-beat-id="${safeId}"]`);
     return document.querySelectorAll(selector);
   }
 
@@ -1206,7 +1214,7 @@ function renderCard(beat, index, queue) {
           return;
         }
         const beatId = parseInt(btn.dataset.beatId);
-        btn.classList.toggle('liked', !isLiked(beatId)); // optimistic: show the post-toggle state
+        btn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
         toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     });
@@ -1583,13 +1591,13 @@ if (featuredSorted.length > 0) {
       if (playerLike) {
         const liked = isLiked(state.currentBeat.id);
         playerLike.classList.toggle('liked', liked);
-        playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : '';
+        playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
       }
       const fullPlayerLike = document.getElementById('fullPlayerLike');
       if (fullPlayerLike) {
         const liked = isLiked(state.currentBeat.id);
         fullPlayerLike.classList.toggle('liked', liked);
-        fullPlayerLike.style.color = liked ? LIKE_COLOR_ACTIVE : '';
+        fullPlayerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
       }
     }
   }
@@ -1917,7 +1925,7 @@ function attachBeatCardEvents() {
           showToast('Please sign in to like beats', 'fa-sign-in-alt');
           return;
         }
-        likeBtn.classList.toggle('liked', !isLiked(beatId)); // optimistic: show the post-toggle state
+        likeBtn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
         toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     }
@@ -2012,6 +2020,7 @@ function showCheckoutModal(beat) {
   // =============================================================
   // Single DOMContentLoaded handler — all event wiring lives here
   // so DOM elements are guaranteed to exist before we query them.
+  let _muteBtnInserted = false; // guard against duplicate mute button insertion
   document.addEventListener('DOMContentLoaded', function() {
     logger.info('app:dom-ready');
 
@@ -2338,7 +2347,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     const _volRow = document.querySelector('.volume-row');
 
     // Feature-detect whether programmatic volume control is supported.
-    // On iOS Safari audio.volume is silently ignored — setting it to 0.5 leaves it at 1.
+    // Desktop browsers and Android Chrome/WebView support it fully.
+    // iOS Safari silently ignores audio.volume — volume is hardware-only on iOS.
     // Two probe values (0.123 and 0.879) are chosen to be far from common default volumes
     // (0, 0.5, 1.0) so they are unlikely to coincidentally match the real volume, preventing
     // false negatives. We pick whichever probe differs from the current volume to ensure
@@ -2371,10 +2381,11 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         }
       });
       // Insert mute button into the dedicated bottom bar actions container
-      // Guard against duplicate insertion (e.g., if init runs more than once)
+      // Guard against duplicate insertion using an explicit flag
       const _actionsRow = document.getElementById('playerActions');
-      if (_actionsRow && !document.getElementById('iosMuteBtn')) {
+      if (_actionsRow && !_muteBtnInserted) {
         _actionsRow.appendChild(_muteBtn);
+        _muteBtnInserted = true;
       }
     } else {
       if (_volSlider) _volSlider.value = _savedVolume;
