@@ -3,8 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>MarcDBeats</title>
+  <title>MarcDBeats — Exclusive Beats for Creators</title>
+  <meta name="description" content="MarcDBeats — exclusive beats for creators. Browse, preview and license quality beats." />
+  <meta property="og:title" content="MarcDBeats" />
+  <meta property="og:description" content="Exclusive beats for creators. Browse, preview and license quality beats from MarcDBeats." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#0a0a0f" />
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+  <!-- Preconnect to origins used by this app for faster initial loads -->
+  <link rel="preconnect" href="https://api.airtable.com" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   
   <!-- Google Fonts -->
@@ -64,6 +75,7 @@
   const AIRTABLE_TABLE_NAME = 'Beats';
   const BEAT_PRICE = 19.99;           // Standard license price
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+  const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
   // =============================================================
   // 📦 SUPABASE CONFIG
@@ -102,6 +114,23 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     playerQueue: [],
     currentPlaylist: 'featured',
     dataLoaded: false
+  };
+
+  // =============================================================
+  // 📊 LOGGER — centralized, structured console logger
+  // Keeps all log calls in one place so they're easy to silence
+  // or extend (e.g. send to an analytics service later).
+  // =============================================================
+  const logger = {
+    info(event, details) {
+      console.log(`[MDB] ${event}`, details !== undefined ? details : '');
+    },
+    warn(event, details) {
+      console.warn(`[MDB] ⚠️ ${event}`, details !== undefined ? details : '');
+    },
+    error(event, details) {
+      console.error(`[MDB] ❌ ${event}`, details !== undefined ? details : '');
+    },
   };
 
   // =============================================================
@@ -199,6 +228,21 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     if (playlist.cover) return playlist.cover;
     const firstBeat = playlist.beats[0];
     return firstBeat?.artwork || '/assets/artwork/default-cover.jpg';
+  }
+
+  // =============================================================
+  // 🛡️ DOM GUARDRAILS — required element lookup
+  // Use this instead of getElementById for controls that MUST
+  // exist. It returns the element (or null) but also logs a clear
+  // error when something is missing, so you catch HTML regressions
+  // immediately instead of getting a silent no-op.
+  // =============================================================
+  function requireEl(id) {
+    const el = document.getElementById(id);
+    if (!el) {
+      logger.error(`Required DOM element #${id} not found — check your HTML`);
+    }
+    return el;
   }
 
   // =============================================================
@@ -353,7 +397,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   async function loadBeatData(retryCount = 0) {
   // Check if data is already loaded
   if (state.dataLoaded && state.beats.length > 0) {
-    console.log('✅ Using cached beat data');
+    logger.info('data:already-loaded', { beats: state.beats.length });
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
@@ -369,9 +413,20 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     try {
       const cached = localStorage.getItem('marcdbeats_beats_cache');
       if (cached) {
-        const { beats: cachedBeats, ts } = JSON.parse(cached);
-        if (Date.now() - ts < CACHE_DURATION_MS && cachedBeats && cachedBeats.length > 0) {
-          console.log('✅ Using localStorage cache');
+        const parsed = JSON.parse(cached);
+        // Validate versioned envelope: must have correct version, non-empty beats array,
+        // valid timestamps, and not yet expired.
+        const isValid =
+          parsed.version === CACHE_VERSION &&
+          Array.isArray(parsed.data) && parsed.data.length > 0 &&
+          typeof parsed.createdAt === 'number' &&
+          typeof parsed.ttl === 'number' &&
+          (Date.now() - parsed.createdAt < parsed.ttl);
+
+        if (isValid) {
+          const cachedBeats = parsed.data;
+          const ageSeconds = Math.round((Date.now() - parsed.createdAt) / 1000);
+          logger.info('cache:hit', { beats: cachedBeats.length, ageSecs: ageSeconds });
           state.beats = cachedBeats;
           state.featured = cachedBeats.filter(b => b.featured === true).sort((a, b) => (a.Order || 999) - (b.Order || 999));
           state.singles = cachedBeats.filter(b => b.isSingle === true);
@@ -392,22 +447,31 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
           renderBeatStore(); renderBeatTapes(); renderSamples(); renderSync(); updateUI();
           hideLoadingSpinner();
           return;
+        } else {
+          // Cache is stale, outdated version, or corrupt — clear it and refetch
+          const reason = parsed.version !== CACHE_VERSION ? 'version-mismatch' : 'expired-or-corrupt';
+          logger.info('cache:invalidated', { reason });
+          localStorage.removeItem('marcdbeats_beats_cache');
         }
+      } else {
+        logger.info('cache:cold');
       }
-    } catch (e) { /* ignore cache errors */ }
+    } catch (e) {
+      logger.warn('cache:parse-error', e.message);
+      localStorage.removeItem('marcdbeats_beats_cache');
+    }
   }
 
   try {
     // Add delay for retries
     if (retryCount > 0) {
       const delay = retryCount * 1500; // 1.5s, 3s, 4.5s, 6s...
-      console.log(`⏳ Retry attempt ${retryCount}, waiting ${delay}ms...`);
+      logger.info('fetch:retry', { attempt: retryCount, delayMs: delay });
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
-    console.log('📡 Fetching from Airtable...');
+    logger.info('fetch:start', { table: AIRTABLE_TABLE_NAME });
     let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}?maxRecords=100`;
-    console.log('Fetching from Airtable:', url);
 
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
@@ -415,7 +479,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 
     // Handle rate limiting (429)
     if (response.status === 429) {
-      console.warn('⚠️ Rate limited (429), retrying...');
+      logger.warn('fetch:rate-limited', { retryCount });
       if (retryCount < 5) {
         return loadBeatData(retryCount + 1);
       } else {
@@ -428,10 +492,10 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     }
 
     const data = await response.json();
-    console.log('✅ Airtable data received');
+    logger.info('fetch:success', { records: data.records?.length ?? 0 });
 
     if (!data.records || data.records.length === 0) {
-      console.warn('No records found in Airtable');
+      logger.warn('fetch:empty');
       state.beats = [];
       state.loaded = true;
       state.dataLoaded = true;
@@ -486,13 +550,18 @@ state.playlists = playlistIds.map(id => {
     state.loaded = true;
     state.dataLoaded = true;
 
-    // Save to localStorage cache for faster subsequent loads
+    // Save to localStorage cache with versioned envelope for safer invalidation
     try {
       localStorage.setItem('marcdbeats_beats_cache', JSON.stringify({
-        beats: state.beats,
-        ts: Date.now()
+        version: CACHE_VERSION,
+        createdAt: Date.now(),
+        ttl: CACHE_DURATION_MS,
+        data: state.beats,
       }));
-    } catch (e) { /* storage may be full or unavailable */ }
+      logger.info('cache:saved', { beats: state.beats.length });
+    } catch (e) {
+      logger.warn('cache:save-failed', e.message);
+    }
 
     renderBeatStore();
     renderBeatTapes();
@@ -501,13 +570,10 @@ state.playlists = playlistIds.map(id => {
     updateUI();
     hideLoadingSpinner();
 
-    console.log(`✅ Loaded ${state.beats.length} beats from Airtable`);
-    console.log(`📀 ${state.playlists.length} playlists`);
-    console.log(`🎵 ${state.singles.length} singles`);
-    console.log(`⭐ ${state.featured.length} featured`);
+    logger.info('data:loaded', { beats: state.beats.length, playlists: state.playlists.length, singles: state.singles.length, featured: state.featured.length });
     showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
   } catch (error) {
-    console.error('❌ Failed to load data from Airtable:', error);
+    logger.error('fetch:failure', error.message);
     showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
     state.loaded = true;
     hideLoadingSpinner();
@@ -614,8 +680,14 @@ function renderCard(beat, index, queue) {
   
   // LOAD AND PLAY AUDIO
   const audio = document.getElementById('audioPlayer');
+  if (audio) {
+    // Log audio element errors (network failures, unsupported format, etc.)
+    audio.onerror = function() {
+      logger.error('audio:error', { beat: beat.title, code: audio.error?.code });
+    };
+  }
   if (audio && beat.mp3) {
-    console.log('🎵 Loading MP3:', beat.mp3);
+    logger.info('audio:load', { beat: beat.title });
     audio.src = beat.mp3;
     audio.load();
     
@@ -623,20 +695,20 @@ function renderCard(beat, index, queue) {
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
-          console.log('✅ Audio playing');
+          logger.info('audio:playing', { beat: beat.title });
           state.isPlaying = true;
           document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
           document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
         })
         .catch(err => {
-          console.warn('⚠️ Autoplay blocked:', err);
+          logger.warn('audio:autoplay-blocked', { beat: beat.title, reason: err.message });
           state.isPlaying = false;
           document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
           document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
         });
     }
   } else {
-    console.warn('⚠️ No MP3 for beat:', beat.title);
+    logger.warn('audio:no-mp3', { beat: beat.title });
   }
 }
 
@@ -1358,24 +1430,7 @@ function renderCard(beat, index, queue) {
   if (tab === 'sync') renderSync();
 }
 
-  // Filter buttons
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    
-    const filter = btn.dataset.filter;
-    const activeTab = document.querySelector('.tab-nav .active');
-    if (activeTab) {
-      const tab = activeTab.dataset.tab;
-      // Re-render with filter (you can expand this later)
-      if (tab === 'beatstore') renderBeatStore();
-      if (tab === 'beattapes') renderBeatTapes();
-      if (tab === 'samples') renderSamples();
-      if (tab === 'sync') renderSync();
-    }
-  });
-});
+  // Filter buttons are registered inside DOMContentLoaded below to ensure DOM exists.
 
   // =============================================================
   // 🧭 NAVIGATION HELPERS
@@ -1509,26 +1564,7 @@ function closeFullPlayer() {
   }
 }
 
-// Remove ALL existing close button event listeners and add this single one:
-// Make sure this runs after the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', function() {
-  // ... other code ...
-  
-  // CLOSE BUTTON - Single clean listener
-  const closeBtn = document.getElementById('fullPlayerClose');
-  if (closeBtn) {
-    // Remove any existing listeners by cloning
-    const newCloseBtn = closeBtn.cloneNode(true);
-    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-    
-    // Add the new listener
-    newCloseBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      closeFullPlayer();
-    });
-  }
-});
+// fullPlayerClose is wired inside the main DOMContentLoaded handler below.
 
 function syncFullPlayer() {
   const beat = state.currentBeat;
@@ -1926,8 +1962,36 @@ function showCheckoutModal(beat) {
   // =============================================================
   // 🧭 NAVIGATION EVENTS
   // =============================================================
+  // Single DOMContentLoaded handler — all event wiring lives here
+  // so DOM elements are guaranteed to exist before we query them.
   document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM fully loaded - attaching events');
+    logger.info('app:dom-ready');
+
+    // ---- Full player close (single listener, no duplicates) ----
+    const _closeBtnEl = requireEl('fullPlayerClose');
+    if (_closeBtnEl) {
+      _closeBtnEl.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeFullPlayer();
+      });
+    }
+
+    // ---- Filter buttons ----
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const activeTab = document.querySelector('.tab-nav .active');
+        if (activeTab) {
+          const tab = activeTab.dataset.tab;
+          if (tab === 'beatstore') renderBeatStore();
+          if (tab === 'beattapes') renderBeatTapes();
+          if (tab === 'samples') renderSamples();
+          if (tab === 'sync') renderSync();
+        }
+      });
+    });
 
     document.querySelectorAll('.tab-nav button').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2003,8 +2067,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
 });
     document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
-    document.getElementById('playerPlay')?.addEventListener('click', () => {
-      const audio = document.getElementById('audioPlayer');
+    requireEl('playerPlay')?.addEventListener('click', () => {
+      const audio = requireEl('audioPlayer');
       if (!audio || !audio.src) {
         showToast('No audio available for this beat', 'fa-exclamation-circle');
         return;
@@ -2019,7 +2083,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
         showToast('Paused', 'fa-pause');
       } else {
         audio.play().catch(e => {
-          console.warn('Playback failed:', e);
+          logger.warn('audio:playback-failed', e.message);
           showToast('Unable to play audio', 'fa-exclamation-circle');
         });
         state.isPlaying = true;
@@ -2055,7 +2119,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
       }
     });
 
-    document.getElementById('audioPlayer')?.addEventListener('ended', () => {
+    requireEl('audioPlayer')?.addEventListener('ended', () => {
+      logger.info('audio:ended', { beat: state.currentBeat?.title });
       state.isPlaying = false;
       document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
       const fpBtn = document.getElementById('fullPlayerPlay');
@@ -2116,13 +2181,13 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     });
     
     init();
-    console.log('MarcDBeats v7 loaded!');
+    logger.info('app:init-called');
 
     // ---- Full Player Controls (wired here so DOM exists) ----
     const _fullOverlay = document.getElementById('fullPlayerOverlay');
 
-    document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
-      const audio = document.getElementById('audioPlayer');
+    requireEl('fullPlayerPlay')?.addEventListener('click', function() {
+      const audio = requireEl('audioPlayer');
       if (!audio || !audio.src) {
         showToast('No audio available', 'fa-exclamation-circle');
         return;
@@ -2133,15 +2198,18 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
       } else {
-        audio.play().catch(e => console.warn('Playback failed:', e));
+        audio.play().catch(e => {
+          logger.warn('audio:playback-failed', e.message);
+          showToast('Unable to play audio', 'fa-exclamation-circle');
+        });
         state.isPlaying = true;
         document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
       }
     });
 
-    document.getElementById('fullPlayerPrev')?.addEventListener('click', prevBeat);
-    document.getElementById('fullPlayerNext')?.addEventListener('click', nextBeat);
+    requireEl('fullPlayerPrev')?.addEventListener('click', prevBeat);
+    requireEl('fullPlayerNext')?.addEventListener('click', nextBeat);
 
     document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
       if (!isLoggedIn()) {
@@ -2175,7 +2243,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     });
 
     // ---- Unified Audio Progress Tracking ----
-    const _audioEl = document.getElementById('audioPlayer');
+    const _audioEl = requireEl('audioPlayer');
     const _progSlider = document.getElementById('progressSlider');
     const _fullProgSlider = document.getElementById('fullProgressSlider');
 
@@ -2210,13 +2278,22 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       }
     });
 
-    // Volume control
-    document.getElementById('volumeSlider')?.addEventListener('input', function() {
-      if (_audioEl) _audioEl.volume = parseFloat(this.value);
+    // ---- Volume control with persistence ----
+    // Restore saved volume on app start
+    const _savedVolume = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
+    const _volSlider = document.getElementById('volumeSlider');
+    if (_volSlider) _volSlider.value = _savedVolume;
+    if (_audioEl) _audioEl.volume = _savedVolume;
+
+    _volSlider?.addEventListener('input', function() {
+      const vol = parseFloat(this.value);
+      if (_audioEl) _audioEl.volume = vol;
+      // Persist volume across sessions
+      localStorage.setItem('marcdbeats_volume', this.value);
       const icon = document.getElementById('volumeIcon');
       if (icon) {
-        if (parseFloat(this.value) === 0) icon.className = 'fas fa-volume-mute';
-        else if (parseFloat(this.value) < 0.5) icon.className = 'fas fa-volume-down';
+        if (vol === 0) icon.className = 'fas fa-volume-mute';
+        else if (vol < 0.5) icon.className = 'fas fa-volume-down';
         else icon.className = 'fas fa-volume-up';
       }
     });
