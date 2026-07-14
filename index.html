@@ -365,6 +365,14 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   // =============================================================
   // 🛒 CART FUNCTIONS
   // =============================================================
+  function triggerCartAnimation(el) {
+    if (!el) return;
+    el.classList.remove('cart-add-animation');
+    void el.offsetWidth; // force reflow to re-trigger animation
+    el.classList.add('cart-add-animation');
+    el.addEventListener('animationend', () => el.classList.remove('cart-add-animation'), { once: true });
+  }
+
   function addToCart(beatId) {
     const beat = getBeat(beatId);
     if (!beat) return;
@@ -376,19 +384,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     updateCartBadge();
     showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
     // Animate all cart buttons for this beat and the player cart icon
-    document.querySelectorAll(`.cart-sm[data-beat-id="${beatId}"], .cart-btn-track[data-beat-id="${beatId}"]`).forEach(btn => {
-      btn.classList.remove('cart-add-animation');
-      void btn.offsetWidth; // force reflow to re-trigger animation
-      btn.classList.add('cart-add-animation');
-      btn.addEventListener('animationend', () => btn.classList.remove('cart-add-animation'), { once: true });
-    });
-    const playerCartBtn = document.getElementById('playerAddToCart');
-    if (playerCartBtn) {
-      playerCartBtn.classList.remove('cart-add-animation');
-      void playerCartBtn.offsetWidth;
-      playerCartBtn.classList.add('cart-add-animation');
-      playerCartBtn.addEventListener('animationend', () => playerCartBtn.classList.remove('cart-add-animation'), { once: true });
-    }
+    document.querySelectorAll(`.cart-sm[data-beat-id="${beatId}"], .cart-btn-track[data-beat-id="${beatId}"]`).forEach(triggerCartAnimation);
+    triggerCartAnimation(document.getElementById('playerAddToCart'));
   }
 
   function removeFromCart(beatId) {
@@ -1566,11 +1563,8 @@ if (featuredSorted.length > 0) {
 
   // Sync every like button on the page to the current state.likes list
   function syncAllLikeButtons() {
-    document.querySelectorAll('[data-beat-id]').forEach(el => {
-      if (!el.classList.contains('like-sm') && !el.classList.contains('like-btn-track')) return;
-      const beatId = parseInt(el.dataset.beatId);
-      const liked = isLiked(beatId);
-      el.classList.toggle('liked', liked);
+    document.querySelectorAll('.like-sm[data-beat-id], .like-btn-track[data-beat-id]').forEach(el => {
+      el.classList.toggle('liked', isLiked(parseInt(el.dataset.beatId)));
     });
     // Sync bottom bar player like button
     if (state.currentBeat) {
@@ -2326,16 +2320,24 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
     const _volSlider = document.getElementById('volumeSlider');
     const _volRow = document.querySelector('.volume-row');
-    const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-    if (_isIOS && _volRow) {
-      // iOS ignores programmatic audio volume — replace slider with a mute toggle
+    // Feature-detect whether programmatic volume control is supported.
+    // On iOS Safari audio.volume is silently ignored — setting it to 0.5 leaves it at 1.
+    let _volumeControlSupported = true;
+    if (_audioEl) {
+      const _prevVol = _audioEl.volume;
+      _audioEl.volume = _prevVol > 0.5 ? 0.4 : 0.6;
+      _volumeControlSupported = _audioEl.volume !== _prevVol;
+      _audioEl.volume = _prevVol; // restore
+    }
+
+    if (!_volumeControlSupported && _volRow) {
+      // Programmatic volume not supported (iOS) — hide slider, show mute toggle
       _volRow.classList.add('ios-volume-hidden');
-      // Insert a compact mute toggle next to the player controls instead
       const _muteBtn = document.createElement('button');
       _muteBtn.id = 'iosMuteBtn';
+      _muteBtn.className = 'mute-toggle-btn';
       _muteBtn.setAttribute('aria-label', 'Mute / Unmute');
-      _muteBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);font-size:18px;padding:4px 8px;cursor:pointer;border-radius:50%;';
       _muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
       _muteBtn.addEventListener('click', function() {
         if (_audioEl) {
@@ -2343,7 +2345,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
           _muteBtn.innerHTML = _audioEl.muted
             ? '<i class="fas fa-volume-mute"></i>'
             : '<i class="fas fa-volume-up"></i>';
-          _muteBtn.style.color = _audioEl.muted ? 'var(--accent)' : 'var(--text-muted)';
+          _muteBtn.classList.toggle('muted', _audioEl.muted);
         }
       });
       // Add mute button to the right side of the bottom bar action row
@@ -3517,7 +3519,7 @@ input[type="range"]:focus-visible {
     width: 22px;
     height: 22px;
   }
-  /* iOS restricts programmatic volume — hide slider, show mute toggle */
+  /* Volume row hidden when programmatic control is unsupported */
   .volume-row.ios-volume-hidden {
     display: none;
   }
@@ -3525,6 +3527,21 @@ input[type="range"]:focus-visible {
   .spotify-player {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
+}
+
+/* Mute toggle button shown when slider is unavailable */
+.mute-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.2s;
+}
+.mute-toggle-btn.muted {
+  color: var(--accent);
 }
     
   </style>
