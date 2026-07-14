@@ -1980,7 +1980,7 @@ function showCheckoutModal(beat) {
     <p class="sub">You're about to purchase a license for "${beat.title}"</p>
     
     <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
-      <div style="font-size:48px;font-weight:800;color:var(--accent);">\${BEAT_PRICE.toFixed(2)}</div>
+      <div style="font-size:48px;font-weight:800;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
@@ -1990,7 +1990,7 @@ function showCheckoutModal(beat) {
     </div>
 
     <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Pay $\${BEAT_PRICE.toFixed(2)}
+      <i class="fas fa-lock"></i> Pay $${BEAT_PRICE.toFixed(2)}
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
