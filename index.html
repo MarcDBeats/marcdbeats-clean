@@ -6,12 +6,6 @@
   <title>MarcDBeats</title>
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>MarcDBeats</title>
-  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Allura&display=swap" rel="stylesheet" />
@@ -68,6 +62,8 @@
   const AIRTABLE_API_KEY = 'patBKZiLmkE0gKJUw.900d727f261dba00b44ed7196327030a6efd35250f6e8a7c5c8b02df5bb63cef';
   const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
   const AIRTABLE_TABLE_NAME = 'Beats';
+  const BEAT_PRICE = 19.99;           // Standard license price
+  const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
   // =============================================================
   // 📦 SUPABASE CONFIG
@@ -143,6 +139,14 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return mins + ':' + (secs < 10 ? '0' : '') + secs;
+  }
+  function showLoadingSpinner() {
+    const el = document.getElementById('loadingOverlay');
+    if (el) el.style.display = 'flex';
+  }
+  function hideLoadingSpinner() {
+    const el = document.getElementById('loadingOverlay');
+    if (el) el.style.display = 'none';
   }
   function getBeat(id) { return state.beats.find(b => b.id === id); }
   function getPlaylistBeats(playlistId) {
@@ -358,6 +362,41 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     return;
   }
 
+  showLoadingSpinner();
+
+  // Check localStorage cache first (valid for 10 minutes)
+  if (retryCount === 0) {
+    try {
+      const cached = localStorage.getItem('marcdbeats_beats_cache');
+      if (cached) {
+        const { beats: cachedBeats, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_DURATION_MS && cachedBeats && cachedBeats.length > 0) {
+          console.log('✅ Using localStorage cache');
+          state.beats = cachedBeats;
+          state.featured = cachedBeats.filter(b => b.featured === true).sort((a, b) => (a.Order || 999) - (b.Order || 999));
+          state.singles = cachedBeats.filter(b => b.isSingle === true);
+          const cachedPlaylistIds = [...new Set(cachedBeats.map(b => b.playlist).filter(Boolean))];
+          state.playlists = cachedPlaylistIds.map(id => {
+            const pBeats = cachedBeats.filter(b => b.playlist === id);
+            const firstBeat = pBeats[0];
+            return {
+              id,
+              name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              series: firstBeat?.series || '',
+              seriesNumber: firstBeat?.seriesNumber || 999,
+              beats: pBeats.sort((a, b) => a.trackNumber - b.trackNumber)
+            };
+          });
+          state.loaded = true;
+          state.dataLoaded = true;
+          renderBeatStore(); renderBeatTapes(); renderSamples(); renderSync(); updateUI();
+          hideLoadingSpinner();
+          return;
+        }
+      }
+    } catch (e) { /* ignore cache errors */ }
+  }
+
   try {
     // Add delay for retries
     if (retryCount > 0) {
@@ -447,11 +486,20 @@ state.playlists = playlistIds.map(id => {
     state.loaded = true;
     state.dataLoaded = true;
 
+    // Save to localStorage cache for faster subsequent loads
+    try {
+      localStorage.setItem('marcdbeats_beats_cache', JSON.stringify({
+        beats: state.beats,
+        ts: Date.now()
+      }));
+    } catch (e) { /* storage may be full or unavailable */ }
+
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
     renderSync();
     updateUI();
+    hideLoadingSpinner();
 
     console.log(`✅ Loaded ${state.beats.length} beats from Airtable`);
     console.log(`📀 ${state.playlists.length} playlists`);
@@ -462,6 +510,7 @@ state.playlists = playlistIds.map(id => {
     console.error('❌ Failed to load data from Airtable:', error);
     showToast('Failed to load beats: ' + error.message, 'fa-exclamation-circle');
     state.loaded = true;
+    hideLoadingSpinner();
   }
 }
 
@@ -507,7 +556,17 @@ function renderCard(beat, index, queue) {
   state.playerQueue = queue || state.beats;
   state.currentIndex = index;
   state.currentBeat = beat;
-  
+
+  // Reset progress bars whenever a new beat is selected
+  const _prog = document.getElementById('progressSlider');
+  const _fullProg = document.getElementById('fullProgressSlider');
+  if (_prog) _prog.value = 0;
+  if (_fullProg) _fullProg.value = 0;
+  const _tCur = document.getElementById('timeCurrent');
+  const _tFull = document.getElementById('fullTimeCurrent');
+  if (_tCur) _tCur.textContent = '0:00';
+  if (_tFull) _tFull.textContent = '0:00';
+
   // UPDATE BOTTOM PLAYER
   const titleEl = document.getElementById('playerTitle');
   if (titleEl) titleEl.textContent = beat.title;
@@ -795,7 +854,7 @@ function renderCard(beat, index, queue) {
     let total = 0;
     modalBox.innerHTML = `
       <h2>Your Cart (${state.cart.length})</h2>
-      <p class="sub">Each license is $19.99</p>
+      <p class="sub">Each license is $${BEAT_PRICE.toFixed(2)}</p>
       ${state.cart.map(beat => `
   <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -804,7 +863,7 @@ function renderCard(beat, index, queue) {
         <div style="font-size:13px;color:var(--text-muted);">${beat.artist}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:15px;font-weight:600;color:var(--accent);">$19.99</span>
+        <span style="font-size:15px;font-weight:600;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</span>
         <button class="cart-item-remove" data-beat-id="${beat.id}" style="background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:4px 6px;">
           <i class="fas fa-times"></i>
         </button>
@@ -823,13 +882,9 @@ function renderCard(beat, index, queue) {
     `;
 
     function updateCartTotal() {
-      const inputs = document.querySelectorAll('.cart-price-input');
-      let total = 0;
-      inputs.forEach(input => {
-        const val = parseFloat(input.value) || 0;
-        if (val >= 1) total += val;
-      });
-      document.getElementById('cartTotal').textContent = `$${total.toFixed(2)}`;
+      const total = state.cart.length * BEAT_PRICE;
+      const el = document.getElementById('cartTotal');
+      if (el) el.textContent = `$${total.toFixed(2)}`;
     }
 
     document.querySelectorAll('.cart-item-remove').forEach(btn => {
@@ -1451,13 +1506,6 @@ function closeFullPlayer() {
   const overlay = document.getElementById('fullPlayerOverlay');
   if (overlay) {
     overlay.classList.remove('active');
-    // Also pause the audio when closing
-    const audio = document.getElementById('audioPlayer');
-    if (audio && state.isPlaying) {
-      audio.pause();
-      state.isPlaying = false;
-      document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    }
   }
 }
 
@@ -1530,193 +1578,6 @@ function syncFullPlayer() {
 }
 
 // =============================================================
-// FULL PLAYER EVENT LISTENERS
-// =============================================================
-
-// Play/Pause button
-document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || !audio.src) {
-    showToast('No audio available', 'fa-exclamation-circle');
-    return;
-  }
-  
-  if (state.isPlaying) {
-    audio.pause();
-    state.isPlaying = false;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-  } else {
-    audio.play().catch(e => console.warn('Playback failed:', e));
-    state.isPlaying = true;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-  }
-});
-
-// Previous button
-document.getElementById('fullPlayerPrev')?.addEventListener('click', function() {
-  prevBeat();
-  setTimeout(syncFullPlayer, 100);
-});
-
-// Next button
-document.getElementById('fullPlayerNext')?.addEventListener('click', function() {
-  nextBeat();
-  setTimeout(syncFullPlayer, 100);
-});
-
-// Like button
-document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
-  if (!isLoggedIn()) {
-    showToast('Please sign in to like beats ❤️', 'fa-sign-in-alt');
-    showAuthModal();
-    return;
-  }
-  if (state.currentBeat) {
-    toggleLike(state.currentBeat.id);
-    const likeBtn = document.getElementById('fullPlayerLike');
-    if (likeBtn) {
-      const liked = isLiked(state.currentBeat.id);
-      likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
-      likeBtn.classList.toggle('liked', liked);
-    }
-  }
-});
-
-// Add to Cart button
-document.getElementById('fullPlayerAddToCart')?.addEventListener('click', function() {
-  if (state.currentBeat) {
-    addToCart(state.currentBeat.id);
-  }
-});
-
-// Cart button
-document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
-
-// Progress bar
-document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
-  const audio = document.getElementById('audioPlayer');
-  if (!isNaN(audio.duration) && audio.duration > 0) {
-    const seekTime = (parseFloat(this.value) / 100) * audio.duration;
-    audio.currentTime = seekTime;
-    document.getElementById('fullTimeCurrent').textContent = formatTime(seekTime);
-  }
-});
-
-// Sync full player with audio updates
-document.getElementById('audioPlayer')?.addEventListener('timeupdate', function() {
-  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) {
-    syncFullPlayer();
-  }
-});
-// =============================================================
-// FULL PLAYER EVENT LISTENERS
-// =============================================================
-
-
-// Swipe down to close
-const fullPlayerOverlay = document.getElementById('fullPlayerOverlay');
-let touchStartY = 0;
-
-fullPlayerOverlay?.addEventListener('touchstart', function(e) {
-  touchStartY = e.touches[0].clientY;
-}, { passive: true });
-
-fullPlayerOverlay?.addEventListener('touchmove', function(e) {
-  const touchY = e.touches[0].clientY;
-  const diff = touchY - touchStartY;
-  if (diff > 80) {
-    closeFullPlayer();
-    touchStartY = 0;
-  }
-}, { passive: true });
-
-// Play/Pause button
-document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
-  const audio = document.getElementById('audioPlayer');
-  if (!audio || !audio.src) {
-    showToast('No audio available', 'fa-exclamation-circle');
-    return;
-  }
-  
-  if (state.isPlaying) {
-    audio.pause();
-    state.isPlaying = false;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
-  } else {
-    audio.play().catch(e => console.warn('Playback failed:', e));
-    state.isPlaying = true;
-    document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
-  }
-});
-
-// Previous button
-document.getElementById('fullPlayerPrev')?.addEventListener('click', function() {
-  prevBeat();
-  setTimeout(syncFullPlayer, 100);
-});
-
-// Next button
-document.getElementById('fullPlayerNext')?.addEventListener('click', function() {
-  nextBeat();
-  setTimeout(syncFullPlayer, 100);
-});
-
-// Like button - requires login
-document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
-  if (!isLoggedIn()) {
-    showToast('Please sign in to like beats ❤️', 'fa-sign-in-alt');
-    showAuthModal();
-    return;
-  }
-  if (state.currentBeat) {
-    toggleLike(state.currentBeat.id);
-    const likeBtn = document.getElementById('fullPlayerLike');
-    if (likeBtn) {
-      const liked = isLiked(state.currentBeat.id);
-      likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
-      likeBtn.classList.toggle('liked', liked);
-    }
-  }
-});
-
-// Add to Cart button
-document.getElementById('fullPlayerAddToCart')?.addEventListener('click', function() {
-  if (state.currentBeat) {
-    addToCart(state.currentBeat.id);
-  }
-});
-
-// Cart button
-document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
-
-// Progress bar - allows seeking
-document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
-  const audio = document.getElementById('audioPlayer');
-  if (!isNaN(audio.duration) && audio.duration > 0) {
-    const seekTime = (parseFloat(this.value) / 100) * audio.duration;
-    audio.currentTime = seekTime;
-    document.getElementById('fullTimeCurrent').textContent = formatTime(seekTime);
-  }
-});
-
-// Updates the full player when audio plays
-document.getElementById('audioPlayer')?.addEventListener('timeupdate', function() {
-  if (document.getElementById('fullPlayerOverlay').classList.contains('active')) {
-    syncFullPlayer();
-  }
-
-});
-
-
-// =============================================================
-// 📱 OFFTOP-STYLE RENDER FUNCTIONS    <-- THIS STAYS THE SAME
-// =============================================================
-
-  // =============================================================
 // 📱 OFFTOP-STYLE RENDER FUNCTIONS
 // =============================================================
 
@@ -1735,7 +1596,7 @@ function renderBeatStore() {
   grid.innerHTML = beats.map(beat => `
   <div class="beat-card" data-beat-id="${beat.id}">
     <div class="beat-card-art">
-      <img src="${beat.artwork}" alt="${beat.title}" />
+      <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
     </div>
     <div class="beat-card-info">
       <div class="beat-card-title">${beat.title}</div>
@@ -1744,7 +1605,7 @@ function renderBeatStore() {
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
       <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        $19.99
+        \${BEAT_PRICE.toFixed(2)}
       </button>
       <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
         <i class="fas fa-heart"></i>
@@ -1778,7 +1639,7 @@ function renderBeatTapes() {
           const cover = getPlaylistCover(playlist);
           return `
             <div class="playlist-card" data-playlist-id="${playlist.id}">
-              <div class="cover"><img src="${cover}" alt="${playlist.name}" /></div>
+              <div class="cover"><img src="${cover}" alt="${playlist.name}" loading="lazy" /></div>
               <div class="info">
                 <div class="name">${playlist.name}</div>
                 <div class="count">${playlist.beats.length} beats</div>
@@ -1819,7 +1680,7 @@ function renderBeatTapes() {
             return `
               <div class="playlist-card-horizontal" data-playlist-id="${playlist.id}" style="flex:0 0 140px;scroll-snap-align:start;background:var(--bg-card);border-radius:12px;overflow:hidden;border:1px solid var(--border-subtle);cursor:pointer;transition:0.2s;">
                 <div style="width:100%;aspect-ratio:1/1;overflow:hidden;background:var(--bg-card-hover);">
-                  <img src="${cover}" alt="${playlist.name}" style="width:100%;height:100%;object-fit:cover;" />
+                  <img src="${cover}" alt="${playlist.name}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
                 </div>
                 <div style="padding:8px 10px 10px;">
                   <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -1865,7 +1726,7 @@ function renderSamples() {
   grid.innerHTML = samples.map(beat => `
   <div class="beat-card" data-beat-id="${beat.id}">
     <div class="beat-card-art">
-      <img src="${beat.artwork}" alt="${beat.title}" />
+      <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
     </div>
     <div class="beat-card-info">
       <div class="beat-card-title">${beat.title}</div>
@@ -1874,7 +1735,7 @@ function renderSamples() {
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
       <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        $19.99
+        \${BEAT_PRICE.toFixed(2)}
       </button>
       <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
         <i class="fas fa-heart"></i>
@@ -1899,7 +1760,7 @@ function renderSync() {
   grid.innerHTML = syncBeats.map(beat => `
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
-        <img src="${beat.artwork}" alt="${beat.title}" />
+        <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
         <span class="featured-badge">🎬</span>
       </div>
       <div class="beat-card-info">
@@ -2027,7 +1888,7 @@ function showCheckoutModal(beat) {
     <p class="sub">You're about to purchase a license for "${beat.title}"</p>
     
     <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
-      <div style="font-size:48px;font-weight:800;color:var(--accent);">$19.99</div>
+      <div style="font-size:48px;font-weight:800;color:var(--accent);">\${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
@@ -2037,7 +1898,7 @@ function showCheckoutModal(beat) {
     </div>
 
     <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Pay $19.99
+      <i class="fas fa-lock"></i> Pay $\${BEAT_PRICE.toFixed(2)}
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
@@ -2153,6 +2014,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
         audio.pause();
         state.isPlaying = false;
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+        const fpBtn = document.getElementById('fullPlayerPlay');
+        if (fpBtn) fpBtn.innerHTML = '<i class="fas fa-play"></i>';
         showToast('Paused', 'fa-pause');
       } else {
         audio.play().catch(e => {
@@ -2161,6 +2024,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
         });
         state.isPlaying = true;
         document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        const fpBtn = document.getElementById('fullPlayerPlay');
+        if (fpBtn) fpBtn.innerHTML = '<i class="fas fa-pause"></i>';
         const title = document.getElementById('playerTitle')?.textContent;
         showToast(`Playing "${title}"`, 'fa-play');
       }
@@ -2193,6 +2058,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     document.getElementById('audioPlayer')?.addEventListener('ended', () => {
       state.isPlaying = false;
       document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+      const fpBtn = document.getElementById('fullPlayerPlay');
+      if (fpBtn) fpBtn.innerHTML = '<i class="fas fa-play"></i>';
       nextBeat();
     });
 
@@ -2250,6 +2117,122 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     
     init();
     console.log('MarcDBeats v7 loaded!');
+
+    // ---- Full Player Controls (wired here so DOM exists) ----
+    const _fullOverlay = document.getElementById('fullPlayerOverlay');
+
+    document.getElementById('fullPlayerPlay')?.addEventListener('click', function() {
+      const audio = document.getElementById('audioPlayer');
+      if (!audio || !audio.src) {
+        showToast('No audio available', 'fa-exclamation-circle');
+        return;
+      }
+      if (state.isPlaying) {
+        audio.pause();
+        state.isPlaying = false;
+        document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
+      } else {
+        audio.play().catch(e => console.warn('Playback failed:', e));
+        state.isPlaying = true;
+        document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+      }
+    });
+
+    document.getElementById('fullPlayerPrev')?.addEventListener('click', prevBeat);
+    document.getElementById('fullPlayerNext')?.addEventListener('click', nextBeat);
+
+    document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
+      if (!isLoggedIn()) {
+        showToast('Please sign in to like beats ❤️', 'fa-sign-in-alt');
+        showAuthModal();
+        return;
+      }
+      if (state.currentBeat) {
+        toggleLike(state.currentBeat.id);
+        const likeBtn = document.getElementById('fullPlayerLike');
+        if (likeBtn) {
+          const liked = isLiked(state.currentBeat.id);
+          likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+          likeBtn.classList.toggle('liked', liked);
+        }
+      }
+    });
+
+    document.getElementById('fullPlayerAddToCart')?.addEventListener('click', function() {
+      if (state.currentBeat) addToCart(state.currentBeat.id);
+    });
+
+    document.getElementById('fullPlayerCart')?.addEventListener('click', renderCartModal);
+
+    // Full player progress bar seeking
+    document.getElementById('fullProgressSlider')?.addEventListener('input', function() {
+      const audio = document.getElementById('audioPlayer');
+      if (audio && !isNaN(audio.duration) && audio.duration > 0) {
+        audio.currentTime = (parseFloat(this.value) / 100) * audio.duration;
+      }
+    });
+
+    // ---- Unified Audio Progress Tracking ----
+    const _audioEl = document.getElementById('audioPlayer');
+    const _progSlider = document.getElementById('progressSlider');
+    const _fullProgSlider = document.getElementById('fullProgressSlider');
+
+    if (_audioEl) {
+      _audioEl.addEventListener('timeupdate', function() {
+        if (!isNaN(_audioEl.duration) && _audioEl.duration > 0) {
+          const progress = (_audioEl.currentTime / _audioEl.duration) * 100;
+          if (_progSlider) _progSlider.value = progress;
+          const tCur = document.getElementById('timeCurrent');
+          if (tCur) tCur.textContent = formatTime(_audioEl.currentTime);
+          if (_fullOverlay?.classList.contains('active')) {
+            if (_fullProgSlider) _fullProgSlider.value = progress;
+            const ftCur = document.getElementById('fullTimeCurrent');
+            if (ftCur) ftCur.textContent = formatTime(_audioEl.currentTime);
+          }
+        }
+      });
+
+      _audioEl.addEventListener('loadedmetadata', function() {
+        const dur = formatTime(_audioEl.duration);
+        const tTot = document.getElementById('timeTotal');
+        const ftTot = document.getElementById('fullTimeTotal');
+        if (tTot) tTot.textContent = dur;
+        if (ftTot) ftTot.textContent = dur;
+      });
+    }
+
+    // Bottom progress bar seeking
+    _progSlider?.addEventListener('input', function() {
+      if (_audioEl && !isNaN(_audioEl.duration) && _audioEl.duration > 0) {
+        _audioEl.currentTime = (parseFloat(this.value) / 100) * _audioEl.duration;
+      }
+    });
+
+    // Volume control
+    document.getElementById('volumeSlider')?.addEventListener('input', function() {
+      if (_audioEl) _audioEl.volume = parseFloat(this.value);
+      const icon = document.getElementById('volumeIcon');
+      if (icon) {
+        if (parseFloat(this.value) === 0) icon.className = 'fas fa-volume-mute';
+        else if (parseFloat(this.value) < 0.5) icon.className = 'fas fa-volume-down';
+        else icon.className = 'fas fa-volume-up';
+      }
+    });
+
+    // Swipe down to close full player
+    let _touchStartY = 0;
+    _fullOverlay?.addEventListener('touchstart', function(e) {
+      _touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    _fullOverlay?.addEventListener('touchmove', function(e) {
+      if (e.touches[0].clientY - _touchStartY > 80) {
+        closeFullPlayer();
+        _touchStartY = 0;
+      }
+    }, { passive: true });
+
   });
 
   
@@ -3203,12 +3186,130 @@ button:active {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ===== LOADING OVERLAY ===== */
+.loading-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  gap: 16px;
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+/* ===== VOLUME CONTROL ===== */
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  width: 100%;
+}
+.volume-row i {
+  color: var(--text-muted);
+  font-size: 13px;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+.volume-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.15);
+  outline: none;
+}
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  cursor: pointer;
+}
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  cursor: pointer;
+  border: none;
+}
+
+/* ===== MOBILE RESPONSIVENESS ===== */
+
+/* Very small screens (< 380px) */
+@media (max-width: 380px) {
+  .brand-cursive { font-size: 22px; }
+  .header-right button { font-size: 18px; padding: 4px 6px; }
+  .tab-nav button { font-size: 13px; padding: 6px 10px; }
+  .beat-card-title { font-size: 13px; }
+  .beat-card-actions button { padding: 4px 6px; font-size: 12px; }
+  .spotify-player { padding: 8px 12px 12px; }
+  #playerPlay { width: 52px !important; height: 52px !important; font-size: 24px !important; }
+  #playerPrev, #playerNext { font-size: 22px !important; }
+  #playerArtwork { width: 46px !important; height: 46px !important; }
+  #playerTitle { font-size: 12px !important; }
+  #playerArtist { font-size: 11px !important; }
+}
+
+/* Full player overlay — fit on all screen sizes */
+.full-player-overlay {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.full-player-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.full-player-artwork {
+  max-width: min(340px, calc(100vw - 48px));
+}
+
+/* Prevent layout shift on very short screens */
+@media (max-height: 600px) {
+  .full-player-artwork {
+    max-width: 200px;
+    margin-bottom: 12px;
+  }
+  .full-player-info { margin-bottom: 8px; }
+  .full-player-progress { margin-bottom: 12px; }
+  .full-player-controls { gap: 20px; margin-bottom: 16px; }
+  .full-player-controls #fullPlayerPlay { width: 56px; height: 56px; font-size: 28px; }
+}
     
   </style>
 </head>
 <body>
 
 <div class="app" id="app">
+
+<!-- Loading overlay — shown while Airtable data loads -->
+<div class="loading-overlay" id="loadingOverlay" style="display:none;">
+  <div class="loading-spinner"></div>
+  <span class="loading-text">Loading beats…</span>
+</div>
 
   <header class="header">
   <!-- Left: Cursive brand name -->
@@ -3315,6 +3416,12 @@ button:active {
     <span id="timeCurrent" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
     <input type="range" id="progressSlider" min="0" max="100" value="0" style="flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;background:var(--text-muted);outline:none;" />
     <span id="timeTotal" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
+  </div>
+
+  <!-- Volume Row -->
+  <div class="volume-row">
+    <i class="fas fa-volume-up" id="volumeIcon"></i>
+    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" />
   </div>
   
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
