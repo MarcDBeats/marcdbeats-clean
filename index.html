@@ -378,9 +378,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
 
   // Returns all cart buttons on the page for a specific beat
   function getCartButtonsForBeat(beatId) {
-    return document.querySelectorAll(
-      `.cart-sm[data-beat-id="${beatId}"], .cart-btn-track[data-beat-id="${beatId}"]`
-    );
+    const selector = CART_BUTTON_SELECTOR.replace(/\[data-beat-id\]/g, `[data-beat-id="${beatId}"]`);
+    return document.querySelectorAll(selector);
   }
 
   function addToCart(beatId) {
@@ -1205,7 +1204,7 @@ function renderCard(beat, index, queue) {
           return;
         }
         const beatId = parseInt(btn.dataset.beatId);
-        btn.classList.toggle('liked'); // optimistic immediate feedback
+        btn.classList.toggle('liked', !isLiked(beatId)); // optimistic: show the post-toggle state
         toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     });
@@ -1916,7 +1915,7 @@ function attachBeatCardEvents() {
           showToast('Please sign in to like beats', 'fa-sign-in-alt');
           return;
         }
-        likeBtn.classList.toggle('liked'); // optimistic immediate feedback
+        likeBtn.classList.toggle('liked', !isLiked(beatId)); // optimistic: show the post-toggle state
         toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     }
@@ -2345,8 +2344,6 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     let _volumeControlSupported = true;
     if (_audioEl) {
       const _prevVol = _audioEl.volume;
-      // 0.123 and 0.879: chosen to avoid common default volumes (0, 0.5, 1.0)
-      // and far enough apart that neither will coincide with a real saved volume
       const _probeA = 0.123, _probeB = 0.879;
       const _probe = (_prevVol !== _probeA) ? _probeA : _probeB;
       _audioEl.volume = _probe;
@@ -2428,6 +2425,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       --border-subtle: rgba(255, 255, 255, 0.06);
       --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.8);
       --radius-card: 20px;
+      --like-color-active: #22c55e; /* synced with JS LIKE_COLOR_ACTIVE constant */
     }
     html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: none; user-select: none; }
     .app { max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; background: var(--bg-secondary); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0, 0, 0, 0.9); overflow: hidden; }
@@ -3518,7 +3516,7 @@ input[type="range"]:focus-visible {
 /* ===== LIKED STATE STYLES (universal) ===== */
 .like-sm.liked,
 .like-btn-track.liked {
-  color: #22c55e;
+  color: var(--like-color-active);
 }
 .like-sm,
 .like-btn-track {
