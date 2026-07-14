@@ -74,6 +74,13 @@
   const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
   const AIRTABLE_TABLE_NAME = 'Beats';
   const BEAT_PRICE = 19.99;           // Standard license price
+
+  // Like / cart UI selector constants — update both CSS classes and these strings together
+  const LIKE_BUTTON_SELECTOR = '.like-sm[data-beat-id], .like-btn-track[data-beat-id]';
+  const CART_BUTTON_SELECTOR = '.cart-sm[data-beat-id], .cart-btn-track[data-beat-id]';
+  // LIKE_COLOR_ACTIVE must stay in sync with --like-color-active in :root CSS
+  const LIKE_COLOR_ACTIVE = '#22c55e'; // green used for active like buttons
+
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
@@ -156,6 +163,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   }
 
   function isLiked(beatId) { return state.likes.includes(beatId); }
+  // Returns the expected liked state after a toggle — used for optimistic UI updates
+  function getToggledLikeState(beatId) { return !isLiked(beatId); }
   function isLoggedIn() { return state.user !== null; }
   function formatPrice(price) { return `$${price.toFixed(2)}`; }
   function formatViews(views) {
@@ -359,12 +368,30 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       updateUI();
     } catch (error) {
       showToast(error.message, 'fa-exclamation-circle');
+      // Revert optimistic UI update on failure
+      syncAllLikeButtons();
     }
   }
 
   // =============================================================
   // 🛒 CART FUNCTIONS
   // =============================================================
+  function triggerCartAnimation(el) {
+    if (!el) return;
+    el.classList.remove('cart-add-animation');
+    void el.offsetWidth; // force reflow to re-trigger animation
+    el.classList.add('cart-add-animation');
+    el.addEventListener('animationend', () => el.classList.remove('cart-add-animation'), { once: true });
+  }
+
+  // Returns all cart buttons on the page for a specific beat
+  function getCartButtonsForBeat(beatId) {
+    const safeId = parseInt(beatId, 10);
+    if (isNaN(safeId)) return [];
+    const selector = CART_BUTTON_SELECTOR.replace(/\[data-beat-id\]/g, `[data-beat-id="${safeId}"]`);
+    return document.querySelectorAll(selector);
+  }
+
   function addToCart(beatId) {
     const beat = getBeat(beatId);
     if (!beat) return;
@@ -375,6 +402,9 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     state.cart.push(beat);
     updateCartBadge();
     showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
+    // Animate all cart buttons for this beat and the player cart icon
+    getCartButtonsForBeat(beatId).forEach(triggerCartAnimation);
+    triggerCartAnimation(document.getElementById('playerAddToCart'));
   }
 
   function removeFromCart(beatId) {
@@ -670,12 +700,12 @@ function renderCard(beat, index, queue) {
   
   const playerLike = document.getElementById('playerLike');
   if (playerLike) {
-    playerLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+    playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   const fullLike = document.getElementById('fullPlayerLike');
   if (fullLike) {
-    fullLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+    fullLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   // LOAD AND PLAY AUDIO
@@ -1179,10 +1209,13 @@ function renderCard(beat, index, queue) {
     tracklist.querySelectorAll('.like-btn-track').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!isLoggedIn()) {
+          showToast('Please sign in to like beats', 'fa-sign-in-alt');
+          return;
+        }
         const beatId = parseInt(btn.dataset.beatId);
-        toggleLike(beatId);
-        btn.classList.toggle('liked');
-        updateUI();
+        btn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
+        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     });
 
@@ -1544,7 +1577,30 @@ if (featuredSorted.length > 0) {
   }
 
   updateCartBadge();
+  syncAllLikeButtons();
 }
+
+  // Sync every like button on the page to the current state.likes list
+  function syncAllLikeButtons() {
+    document.querySelectorAll(LIKE_BUTTON_SELECTOR).forEach(el => {
+      el.classList.toggle('liked', isLiked(parseInt(el.dataset.beatId)));
+    });
+    // Sync bottom bar and full-player like buttons (these have inline styles, so manage color directly)
+    if (state.currentBeat) {
+      const playerLike = document.getElementById('playerLike');
+      if (playerLike) {
+        const liked = isLiked(state.currentBeat.id);
+        playerLike.classList.toggle('liked', liked);
+        playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
+      }
+      const fullPlayerLike = document.getElementById('fullPlayerLike');
+      if (fullPlayerLike) {
+        const liked = isLiked(state.currentBeat.id);
+        fullPlayerLike.classList.toggle('liked', liked);
+        fullPlayerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
+      }
+    }
+  }
 // =============================================================
 // 📱 FULL PLAYER
 // =============================================================
@@ -1588,7 +1644,7 @@ function syncFullPlayer() {
   const likeBtn = document.getElementById('fullPlayerLike');
   if (likeBtn) {
     likeBtn.classList.toggle('liked', isLiked(beat.id));
-    likeBtn.style.color = isLiked(beat.id) ? '#22c55e' : 'var(--text-muted)';
+    likeBtn.style.color = isLiked(beat.id) ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   // Sync progress
@@ -1640,10 +1696,8 @@ function renderBeatStore() {
     </div>
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-      <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        \${BEAT_PRICE.toFixed(2)}
-      </button>
-      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+      <button class="cart-sm" data-beat-id="${beat.id}" aria-label="Add to cart"><i class="fas fa-cart-plus"></i></button>
+      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}" aria-label="Like this beat">
         <i class="fas fa-heart"></i>
       </button>
     </div>
@@ -1770,10 +1824,8 @@ function renderSamples() {
     </div>
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-      <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        \${BEAT_PRICE.toFixed(2)}
-      </button>
-      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
+      <button class="cart-sm" data-beat-id="${beat.id}" aria-label="Add to cart"><i class="fas fa-cart-plus"></i></button>
+      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}" aria-label="Like this beat">
         <i class="fas fa-heart"></i>
       </button>
     </div>
@@ -1869,8 +1921,12 @@ function attachBeatCardEvents() {
     if (likeBtn) {
       likeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        toggleLike(beatId);
-        likeBtn.classList.toggle('liked');
+        if (!isLoggedIn()) {
+          showToast('Please sign in to like beats', 'fa-sign-in-alt');
+          return;
+        }
+        likeBtn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
+        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     }
     
@@ -1924,7 +1980,7 @@ function showCheckoutModal(beat) {
     <p class="sub">You're about to purchase a license for "${beat.title}"</p>
     
     <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
-      <div style="font-size:48px;font-weight:800;color:var(--accent);">\${BEAT_PRICE.toFixed(2)}</div>
+      <div style="font-size:48px;font-weight:800;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
@@ -1934,7 +1990,7 @@ function showCheckoutModal(beat) {
     </div>
 
     <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Pay $\${BEAT_PRICE.toFixed(2)}
+      <i class="fas fa-lock"></i> Pay $${BEAT_PRICE.toFixed(2)}
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
@@ -1964,6 +2020,7 @@ function showCheckoutModal(beat) {
   // =============================================================
   // Single DOMContentLoaded handler — all event wiring lives here
   // so DOM elements are guaranteed to exist before we query them.
+  let _muteBtnInserted = false; // guard against duplicate mute button insertion
   document.addEventListener('DOMContentLoaded', function() {
     logger.info('app:dom-ready');
 
@@ -2129,6 +2186,10 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     });
 
     document.getElementById('playerLike')?.addEventListener('click', function() {
+      if (!isLoggedIn()) {
+        showToast('Please sign in to like beats', 'fa-sign-in-alt');
+        return;
+      }
       if (state.currentBeat) {
         toggleLike(state.currentBeat.id);
       }
@@ -2222,7 +2283,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         const likeBtn = document.getElementById('fullPlayerLike');
         if (likeBtn) {
           const liked = isLiked(state.currentBeat.id);
-          likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+          likeBtn.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
           likeBtn.classList.toggle('liked', liked);
         }
       }
@@ -2283,21 +2344,66 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     const _rawVol = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
     const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
     const _volSlider = document.getElementById('volumeSlider');
-    if (_volSlider) _volSlider.value = _savedVolume;
-    if (_audioEl) _audioEl.volume = _savedVolume;
+    const _volRow = document.querySelector('.volume-row');
 
-    _volSlider?.addEventListener('input', function() {
-      const vol = parseFloat(this.value);
-      if (_audioEl) _audioEl.volume = vol;
-      // Persist volume across sessions
-      localStorage.setItem('marcdbeats_volume', this.value);
-      const icon = document.getElementById('volumeIcon');
-      if (icon) {
-        if (vol === 0) icon.className = 'fas fa-volume-mute';
-        else if (vol < 0.5) icon.className = 'fas fa-volume-down';
-        else icon.className = 'fas fa-volume-up';
+    // Feature-detect whether programmatic volume control is supported.
+    // Desktop browsers and Android Chrome/WebView support it fully.
+    // iOS Safari silently ignores audio.volume — volume is hardware-only on iOS.
+    // Two probe values (0.123 and 0.879) are chosen to be far from common default volumes
+    // (0, 0.5, 1.0) so they are unlikely to coincidentally match the real volume, preventing
+    // false negatives. We pick whichever probe differs from the current volume to ensure
+    // the test represents a genuine change, then verify the element actually adopted it.
+    let _volumeControlSupported = true;
+    if (_audioEl) {
+      const _prevVol = _audioEl.volume;
+      const _probeA = 0.123, _probeB = 0.879;
+      const _probe = (_prevVol !== _probeA) ? _probeA : _probeB;
+      _audioEl.volume = _probe;
+      _volumeControlSupported = Math.abs(_audioEl.volume - _probe) < 0.01;
+      _audioEl.volume = _prevVol; // restore
+    }
+
+    if (!_volumeControlSupported && _volRow) {
+      // Programmatic volume not supported (iOS) — hide slider, show mute toggle
+      _volRow.classList.add('ios-volume-hidden');
+      const _muteBtn = document.createElement('button');
+      _muteBtn.id = 'iosMuteBtn';
+      _muteBtn.className = 'mute-toggle-btn';
+      _muteBtn.setAttribute('aria-label', 'Mute / Unmute');
+      _muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+      _muteBtn.addEventListener('click', function() {
+        if (_audioEl) {
+          _audioEl.muted = !_audioEl.muted;
+          _muteBtn.innerHTML = _audioEl.muted
+            ? '<i class="fas fa-volume-mute"></i>'
+            : '<i class="fas fa-volume-up"></i>';
+          _muteBtn.classList.toggle('muted', _audioEl.muted);
+        }
+      });
+      // Insert mute button into the dedicated bottom bar actions container
+      // Guard against duplicate insertion using an explicit flag
+      const _actionsRow = document.getElementById('playerActions');
+      if (_actionsRow && !_muteBtnInserted) {
+        _actionsRow.appendChild(_muteBtn);
+        _muteBtnInserted = true;
       }
-    });
+    } else {
+      if (_volSlider) _volSlider.value = _savedVolume;
+      if (_audioEl) _audioEl.volume = _savedVolume;
+
+      _volSlider?.addEventListener('input', function() {
+        const vol = parseFloat(this.value);
+        if (_audioEl) _audioEl.volume = vol;
+        // Persist volume across sessions
+        localStorage.setItem('marcdbeats_volume', this.value);
+        const icon = document.getElementById('volumeIcon');
+        if (icon) {
+          if (vol === 0) icon.className = 'fas fa-volume-mute';
+          else if (vol < 0.5) icon.className = 'fas fa-volume-down';
+          else icon.className = 'fas fa-volume-up';
+        }
+      });
+    }
 
     // Swipe down to close full player
     let _touchStartY = 0;
@@ -2335,6 +2441,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       --border-subtle: rgba(255, 255, 255, 0.06);
       --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.8);
       --radius-card: 20px;
+      --like-color-active: #22c55e; /* synced with JS LIKE_COLOR_ACTIVE constant */
     }
     html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: none; user-select: none; }
     .app { max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; background: var(--bg-secondary); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0, 0, 0, 0.9); overflow: hidden; }
@@ -3410,6 +3517,69 @@ input[type="range"]:focus-visible {
     justify-content: center;
   }
 }
+
+/* ===== CART ADD ANIMATION ===== */
+@keyframes cartBounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.5) rotate(-10deg); }
+  60%  { transform: scale(0.9) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.cart-add-animation {
+  animation: cartBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ===== LIKED STATE STYLES (universal) ===== */
+.like-sm.liked,
+.like-btn-track.liked {
+  color: var(--like-color-active);
+}
+.like-sm,
+.like-btn-track {
+  transition: color 0.2s, transform 0.15s;
+}
+.like-sm:active,
+.like-btn-track:active {
+  transform: scale(1.3);
+}
+
+/* ===== VOLUME SLIDER — LARGER TOUCH THUMB ON MOBILE ===== */
+@media (hover: none) and (pointer: coarse) {
+  .volume-slider {
+    height: 4px;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+  /* Volume row hidden when programmatic control is unsupported */
+  .volume-row.ios-volume-hidden {
+    display: none;
+  }
+  /* Bottom player spacing on mobile */
+  .spotify-player {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Mute toggle button shown when slider is unavailable */
+.mute-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.2s;
+}
+.mute-toggle-btn.muted {
+  color: var(--accent);
+}
     
   </style>
 </head>
@@ -3559,7 +3729,7 @@ input[type="range"]:focus-visible {
     <i class="fas fa-step-forward" aria-hidden="true"></i>
   </button>
 </div>
-    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+    <div id="playerActions" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
   <button id="playerLike" aria-label="Like this beat" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
     <i class="fas fa-heart" aria-hidden="true"></i>
   </button>
