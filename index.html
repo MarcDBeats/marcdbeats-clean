@@ -362,6 +362,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       updateUI();
     } catch (error) {
       showToast(error.message, 'fa-exclamation-circle');
+      // Revert optimistic UI update on failure
+      syncAllLikeButtons();
     }
   }
 
@@ -2339,8 +2341,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     // On iOS Safari audio.volume is silently ignored — setting it to 0.5 leaves it at 1.
     // Two probe values (0.123 and 0.879) are chosen to be far from common default volumes
     // (0, 0.5, 1.0) so they are unlikely to coincidentally match the real volume, preventing
-    // false negatives. We pick the one that differs from the current volume and verify the
-    // element actually adopted it.
+    // false negatives. We pick whichever probe differs from the current volume to ensure
+    // the test represents a genuine change, then verify the element actually adopted it.
     let _volumeControlSupported = true;
     if (_audioEl) {
       const _prevVol = _audioEl.volume;
@@ -2369,8 +2371,11 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         }
       });
       // Insert mute button into the dedicated bottom bar actions container
+      // Guard against duplicate insertion (e.g., if init runs more than once)
       const _actionsRow = document.getElementById('playerActions');
-      if (_actionsRow) _actionsRow.appendChild(_muteBtn);
+      if (_actionsRow && !document.getElementById('iosMuteBtn')) {
+        _actionsRow.appendChild(_muteBtn);
+      }
     } else {
       if (_volSlider) _volSlider.value = _savedVolume;
       if (_audioEl) _audioEl.volume = _savedVolume;
