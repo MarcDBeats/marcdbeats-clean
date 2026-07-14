@@ -76,7 +76,7 @@ Open the app in a browser. Open DevTools **Console** tab (⌥⌘I on Mac, F12 on
 
 ## 6 · Mobile checks (narrow viewport)
 
-Resize browser to **375 × 667** (iPhone SE) and **390 × 844** (iPhone 14).
+Resize browser to **375 × 667** (iPhone SE) and **390 × 844** (iPhone 14 standard).
 
 | Check | Expected result |
 |-------|----------------|

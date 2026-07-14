@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>MarcDBeats — Exclusive Beats for Creators</title>
   <meta name="description" content="MarcDBeats — exclusive beats for creators. Browse, preview and license quality beats." />
-  <meta property="og:title" content="MarcDBeats" />
+  <meta property="og:title" content="MarcDBeats — Exclusive Beats for Creators" />
   <meta property="og:description" content="Exclusive beats for creators. Browse, preview and license quality beats from MarcDBeats." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#0a0a0f" />
@@ -122,14 +122,14 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   // or extend (e.g. send to an analytics service later).
   // =============================================================
   const logger = {
-    info(event, details) {
-      console.log(`[MDB] ${event}`, details !== undefined ? details : '');
+    info(event, details = '') {
+      console.log(`[MDB] ${event}`, details);
     },
-    warn(event, details) {
-      console.warn(`[MDB] ⚠️ ${event}`, details !== undefined ? details : '');
+    warn(event, details = '') {
+      console.warn(`[MDB] ⚠️ ${event}`, details);
     },
-    error(event, details) {
-      console.error(`[MDB] ❌ ${event}`, details !== undefined ? details : '');
+    error(event, details = '') {
+      console.error(`[MDB] ❌ ${event}`, details);
     },
   };
 
@@ -2279,8 +2279,9 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     });
 
     // ---- Volume control with persistence ----
-    // Restore saved volume on app start
-    const _savedVolume = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
+    // Restore saved volume on app start; clamp to [0, 1] to guard against bad data
+    const _rawVol = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
+    const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
     const _volSlider = document.getElementById('volumeSlider');
     if (_volSlider) _volSlider.value = _savedVolume;
     if (_audioEl) _audioEl.volume = _savedVolume;
@@ -3567,7 +3568,7 @@ input[type="range"]:focus-visible {
   </button>
   <button id="playerCart" aria-label="View cart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;position:relative;">
     <i class="fas fa-shopping-cart" aria-hidden="true"></i>
-    <span class="cart-badge" id="playerCartBadge" aria-label="cart item count" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
+    <span class="cart-badge" id="playerCartBadge" aria-hidden="true" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
   </button>
 </div>
   </div>
