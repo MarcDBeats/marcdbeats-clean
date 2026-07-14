@@ -74,6 +74,7 @@
   const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
   const AIRTABLE_TABLE_NAME = 'Beats';
   const BEAT_PRICE = 19.99;           // Standard license price
+  const LIKE_BUTTON_SELECTOR = '.like-sm[data-beat-id], .like-btn-track[data-beat-id]';
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
@@ -1563,13 +1564,17 @@ if (featuredSorted.length > 0) {
 
   // Sync every like button on the page to the current state.likes list
   function syncAllLikeButtons() {
-    document.querySelectorAll('.like-sm[data-beat-id], .like-btn-track[data-beat-id]').forEach(el => {
+    document.querySelectorAll(LIKE_BUTTON_SELECTOR).forEach(el => {
       el.classList.toggle('liked', isLiked(parseInt(el.dataset.beatId)));
     });
-    // Sync bottom bar player like button
+    // Sync bottom bar and full-player like buttons (these have inline styles, so manage color directly)
     if (state.currentBeat) {
       const playerLike = document.getElementById('playerLike');
-      if (playerLike) playerLike.classList.toggle('liked', isLiked(state.currentBeat.id));
+      if (playerLike) {
+        const liked = isLiked(state.currentBeat.id);
+        playerLike.classList.toggle('liked', liked);
+        playerLike.style.color = liked ? '#22c55e' : '';
+      }
       const fullPlayerLike = document.getElementById('fullPlayerLike');
       if (fullPlayerLike) {
         const liked = isLiked(state.currentBeat.id);
@@ -2323,11 +2328,14 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
 
     // Feature-detect whether programmatic volume control is supported.
     // On iOS Safari audio.volume is silently ignored — setting it to 0.5 leaves it at 1.
+    // Use two probes with values far apart so neither can coincidentally equal the real volume.
     let _volumeControlSupported = true;
     if (_audioEl) {
       const _prevVol = _audioEl.volume;
-      _audioEl.volume = _prevVol > 0.5 ? 0.4 : 0.6;
-      _volumeControlSupported = _audioEl.volume !== _prevVol;
+      const _probeA = 0.123, _probeB = 0.879;
+      const _probe = (_prevVol !== _probeA) ? _probeA : _probeB;
+      _audioEl.volume = _probe;
+      _volumeControlSupported = Math.abs(_audioEl.volume - _probe) < 0.01;
       _audioEl.volume = _prevVol; // restore
     }
 
@@ -2348,9 +2356,9 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
           _muteBtn.classList.toggle('muted', _audioEl.muted);
         }
       });
-      // Add mute button to the right side of the bottom bar action row
-      const _playerCartBtn = document.getElementById('playerCart');
-      if (_playerCartBtn) _playerCartBtn.parentNode.insertBefore(_muteBtn, _playerCartBtn.nextSibling);
+      // Insert mute button into the bottom bar action row next to the cart button
+      const _actionsRow = document.getElementById('playerCart')?.parentNode;
+      if (_actionsRow) _actionsRow.appendChild(_muteBtn);
     } else {
       if (_volSlider) _volSlider.value = _savedVolume;
       if (_audioEl) _audioEl.volume = _savedVolume;
@@ -3495,7 +3503,7 @@ input[type="range"]:focus-visible {
 /* ===== LIKED STATE STYLES (universal) ===== */
 .like-sm.liked,
 .like-btn-track.liked {
-  color: #22c55e !important;
+  color: #22c55e;
 }
 .like-sm,
 .like-btn-track {
