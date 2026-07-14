@@ -3375,6 +3375,40 @@ button:active {
   .full-player-controls { gap: 20px; margin-bottom: 16px; }
   .full-player-controls #fullPlayerPlay { width: 56px; height: 56px; font-size: 28px; }
 }
+
+/* ===== ACCESSIBILITY ===== */
+
+/* Keyboard focus styles — show a clear outline when navigating by keyboard.
+   :focus-visible is supported by all modern browsers and avoids the annoying
+   mouse-click outline without hiding it from keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+input[type="range"]:focus-visible {
+  outline-offset: 4px;
+}
+
+/* ===== MINIMUM TAP TARGETS (mobile) =====
+   WCAG 2.5.8 recommends 24×24px minimum, Apple HIG suggests 44×44px.
+   We only enforce this on coarse-pointer (touch) devices so it doesn't
+   change the layout on desktop. */
+@media (hover: none) and (pointer: coarse) {
+  .beat-card-actions button,
+  .track-actions button,
+  .header-right button,
+  .full-player-actions button {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
     
   </style>
 </head>
@@ -3401,11 +3435,11 @@ button:active {
   
   <!-- Right: Cart + Profile -->
   <div class="header-right">
-    <button id="cartNavBtn" title="Cart">
-      <i class="fas fa-shopping-cart"></i>
+    <button id="cartNavBtn" title="Cart" aria-label="Open cart">
+      <i class="fas fa-shopping-cart" aria-hidden="true"></i>
     </button>
-    <button id="authNavBtn" class="auth-btn">
-      <i class="fas fa-user-circle"></i>
+    <button id="authNavBtn" class="auth-btn" aria-label="Sign in or view account">
+      <i class="fas fa-user-circle" aria-hidden="true"></i>
     </button>
   </div>
 </header>
@@ -3427,11 +3461,11 @@ button:active {
     <!-- Beat Store Tab -->
     <div class="tab-content active" id="beatstoreContent">
   <!-- Search Bar -->
-  <div class="beatstore-search" style="display:flex;align-items:center;background:rgba(255,255,255,0.06);border-radius:30px;border:1px solid var(--border-subtle);padding:0 16px;margin-bottom:12px;transition:0.3s;">
-    <i class="fas fa-search" style="color:var(--text-muted);font-size:14px;"></i>
-    <input type="text" id="beatSearchInput" placeholder="Search beats..." style="flex:1;background:transparent;border:none;padding:10px 12px;color:var(--text-primary);font-size:14px;outline:none;min-width:0;" />
-    <button class="beat-search-btn" id="beatSearchBtn" style="background:var(--gradient-1);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;transition:0.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
-      <i class="fas fa-arrow-right"></i>
+  <div class="beatstore-search" role="search" style="display:flex;align-items:center;background:rgba(255,255,255,0.06);border-radius:30px;border:1px solid var(--border-subtle);padding:0 16px;margin-bottom:12px;transition:0.3s;">
+    <i class="fas fa-search" style="color:var(--text-muted);font-size:14px;" aria-hidden="true"></i>
+    <input type="text" id="beatSearchInput" placeholder="Search beats..." aria-label="Search beats" style="flex:1;background:transparent;border:none;padding:10px 12px;color:var(--text-primary);font-size:14px;outline:none;min-width:0;" />
+    <button class="beat-search-btn" id="beatSearchBtn" aria-label="Search" style="background:var(--gradient-1);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;transition:0.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
+      <i class="fas fa-arrow-right" aria-hidden="true"></i>
     </button>
   </div>
   <div class="beat-grid" id="beatStoreGrid"></div>
@@ -3457,7 +3491,7 @@ button:active {
   <!-- Keep playlist detail and other views -->
   <div class="playlist-detail" id="playlistDetail">
     <div class="detail-header">
-      <button class="back-btn" id="detailBack"><i class="fas fa-arrow-left"></i></button>
+      <button class="back-btn" id="detailBack" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
       <div class="detail-title" id="detailTitle">Playlist</div>
       <div class="detail-count" id="detailCount">0 beats</div>
     </div>
@@ -3467,7 +3501,7 @@ button:active {
   <!-- Keep portal and terms views -->
   <div class="portal-view" id="portalView">
     <div class="portal-header">
-      <button class="back-btn" id="portalBack"><i class="fas fa-arrow-left"></i></button>
+      <button class="back-btn" id="portalBack" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
       <h2>My Account</h2>
     </div>
     <div id="portalContent"></div>
@@ -3475,7 +3509,7 @@ button:active {
 
   <div class="terms-view" id="termsView">
     <div class="terms-header">
-      <button class="back-btn" id="termsBack"><i class="fas fa-arrow-left"></i></button>
+      <button class="back-btn" id="termsBack" aria-label="Back"><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
       <h2>Terms & Policies</h2>
     </div>
     <div id="termsContent"></div>
@@ -3490,65 +3524,65 @@ button:active {
   
   <!-- Progress Bar -->
   <div style="display:flex;align-items:center;gap:10px;width:100%;padding:0 4px;">
-    <span id="timeCurrent" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
-    <input type="range" id="progressSlider" min="0" max="100" value="0" style="flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;background:var(--text-muted);outline:none;" />
+    <span id="timeCurrent" style="font-size:11px;color:var(--text-muted);min-width:32px;" aria-live="off">0:00</span>
+    <input type="range" id="progressSlider" min="0" max="100" value="0" aria-label="Seek audio" style="flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;background:var(--text-muted);outline:none;" />
     <span id="timeTotal" style="font-size:11px;color:var(--text-muted);min-width:32px;">0:00</span>
   </div>
 
   <!-- Volume Row -->
   <div class="volume-row">
-    <i class="fas fa-volume-up" id="volumeIcon"></i>
-    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" />
+    <i class="fas fa-volume-up" id="volumeIcon" aria-hidden="true"></i>
+    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
   </div>
   
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
     <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
-      <div id="playerArtwork" style="width:56px;height:56px;border-radius:8px;background:#2a2a3a;flex-shrink:0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+      <div id="playerArtwork" style="width:56px;height:56px;border-radius:8px;background:#2a2a3a;flex-shrink:0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);" aria-hidden="true">
         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;">
           <i class="fas fa-music"></i>
         </div>
       </div>
       <div style="min-width:0;flex:1;">
-        <div id="playerTitle" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select a beat</div>
+        <div id="playerTitle" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" aria-live="polite">Select a beat</div>
         <div id="playerArtist" style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MarcDBeats</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-  <button id="playerPrev" style="background:none;border:none;color:var(--text-secondary);font-size:28px;padding:8px 10px;cursor:pointer;border-radius:50%;transition:0.2s;display:flex;align-items:center;justify-content:center;">
-    <i class="fas fa-step-backward"></i>
+  <button id="playerPrev" aria-label="Previous beat" style="background:none;border:none;color:var(--text-secondary);font-size:28px;padding:8px 10px;cursor:pointer;border-radius:50%;transition:0.2s;display:flex;align-items:center;justify-content:center;">
+    <i class="fas fa-step-backward" aria-hidden="true"></i>
   </button>
-  <button id="playerPlay" style="background:rgba(255,255,255,0.1);border:none;color:white;font-size:32px;width:64px;height:64px;border-radius:50%;cursor:pointer;backdrop-filter:blur(8px);transition:0.2s;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
-    <i class="fas fa-play"></i>
+  <button id="playerPlay" aria-label="Play or pause" style="background:rgba(255,255,255,0.1);border:none;color:white;font-size:32px;width:64px;height:64px;border-radius:50%;cursor:pointer;backdrop-filter:blur(8px);transition:0.2s;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+    <i class="fas fa-play" aria-hidden="true"></i>
   </button>
-  <button id="playerNext" style="background:none;border:none;color:var(--text-secondary);font-size:28px;padding:8px 10px;cursor:pointer;border-radius:50%;transition:0.2s;display:flex;align-items:center;justify-content:center;">
-    <i class="fas fa-step-forward"></i>
+  <button id="playerNext" aria-label="Next beat" style="background:none;border:none;color:var(--text-secondary);font-size:28px;padding:8px 10px;cursor:pointer;border-radius:50%;transition:0.2s;display:flex;align-items:center;justify-content:center;">
+    <i class="fas fa-step-forward" aria-hidden="true"></i>
   </button>
 </div>
     <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-  <button id="playerLike" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
-    <i class="fas fa-heart"></i>
+  <button id="playerLike" aria-label="Like this beat" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
+    <i class="fas fa-heart" aria-hidden="true"></i>
   </button>
-  <button id="playerAddToCart" style="background:none;border:none;color:var(--text-muted);font-size:24px;padding:6px 8px;cursor:pointer;border-radius:50%;font-weight:300;">
-    <i class="fas fa-plus-circle"></i>
+  <button id="playerAddToCart" aria-label="Add to cart" style="background:none;border:none;color:var(--text-muted);font-size:24px;padding:6px 8px;cursor:pointer;border-radius:50%;font-weight:300;">
+    <i class="fas fa-plus-circle" aria-hidden="true"></i>
   </button>
-  <button id="playerCart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;position:relative;">
-    <i class="fas fa-shopping-cart"></i>
-    <span class="cart-badge" id="playerCartBadge" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
+  <button id="playerCart" aria-label="View cart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;position:relative;">
+    <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+    <span class="cart-badge" id="playerCartBadge" aria-label="cart item count" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
   </button>
 </div>
   </div>
 </div>
 
 <!-- Full Player Overlay -->
-<div class="full-player-overlay" id="fullPlayerOverlay">
+<div class="full-player-overlay" id="fullPlayerOverlay" role="dialog" aria-modal="true" aria-label="Full player">
   <div class="full-player-content">
     <!-- Close button -->
-    <button class="full-player-close" id="fullPlayerClose">
-      <i class="fas fa-chevron-down"></i>
+    <button class="full-player-close" id="fullPlayerClose" aria-label="Close full player">
+      <i class="fas fa-chevron-down" aria-hidden="true"></i>
     </button>
     
     <!-- Artwork -->
-    <div class="full-player-artwork" id="fullPlayerArtwork">
+    <div class="full-player-artwork" id="fullPlayerArtwork" aria-hidden="true">
       <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:48px;background:#1a1a2e;">
         <i class="fas fa-music"></i>
       </div>
@@ -3556,29 +3590,29 @@ button:active {
     
     <!-- Beat Info -->
     <div class="full-player-info">
-      <div class="full-player-title" id="fullPlayerTitle">Select a beat</div>
+      <div class="full-player-title" id="fullPlayerTitle" aria-live="polite">Select a beat</div>
       <div class="full-player-artist" id="fullPlayerArtist">MarcDBeats</div>
     </div>
     
     <!-- Progress Bar -->
     <div class="full-player-progress">
-      <span class="full-player-time" id="fullTimeCurrent">0:00</span>
-      <input type="range" id="fullProgressSlider" min="0" max="100" value="0" />
+      <span class="full-player-time" id="fullTimeCurrent" aria-live="off">0:00</span>
+      <input type="range" id="fullProgressSlider" min="0" max="100" value="0" aria-label="Seek audio" />
       <span class="full-player-time" id="fullTimeTotal">0:00</span>
     </div>
     
     <!-- Controls -->
     <div class="full-player-controls">
-      <button id="fullPlayerPrev"><i class="fas fa-step-backward"></i></button>
-      <button id="fullPlayerPlay"><i class="fas fa-play"></i></button>
-      <button id="fullPlayerNext"><i class="fas fa-step-forward"></i></button>
+      <button id="fullPlayerPrev" aria-label="Previous beat"><i class="fas fa-step-backward" aria-hidden="true"></i></button>
+      <button id="fullPlayerPlay" aria-label="Play or pause"><i class="fas fa-play" aria-hidden="true"></i></button>
+      <button id="fullPlayerNext" aria-label="Next beat"><i class="fas fa-step-forward" aria-hidden="true"></i></button>
     </div>
     
     <!-- Bottom Actions -->
     <div class="full-player-actions">
-      <button id="fullPlayerLike"><i class="fas fa-heart"></i></button>
-      <button id="fullPlayerAddToCart"><i class="fas fa-plus-circle"></i></button>
-      <button id="fullPlayerCart"><i class="fas fa-shopping-cart"></i></button>
+      <button id="fullPlayerLike" aria-label="Like this beat"><i class="fas fa-heart" aria-hidden="true"></i></button>
+      <button id="fullPlayerAddToCart" aria-label="Add to cart"><i class="fas fa-plus-circle" aria-hidden="true"></i></button>
+      <button id="fullPlayerCart" aria-label="View cart"><i class="fas fa-shopping-cart" aria-hidden="true"></i></button>
     </div>
   </div>
 </div>
