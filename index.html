@@ -75,6 +75,7 @@
   const AIRTABLE_TABLE_NAME = 'Beats';
   const BEAT_PRICE = 19.99;           // Standard license price
   const LIKE_BUTTON_SELECTOR = '.like-sm[data-beat-id], .like-btn-track[data-beat-id]';
+  const CART_BUTTON_SELECTOR = '.cart-sm[data-beat-id], .cart-btn-track[data-beat-id]';
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
@@ -385,7 +386,8 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     updateCartBadge();
     showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
     // Animate all cart buttons for this beat and the player cart icon
-    document.querySelectorAll(`.cart-sm[data-beat-id="${beatId}"], .cart-btn-track[data-beat-id="${beatId}"]`).forEach(triggerCartAnimation);
+    const _cartBeatSelector = CART_BUTTON_SELECTOR.split(', ').map(s => s.replace('[data-beat-id]', `[data-beat-id="${beatId}"]`)).join(', ');
+    document.querySelectorAll(_cartBeatSelector).forEach(triggerCartAnimation);
     triggerCartAnimation(document.getElementById('playerAddToCart'));
   }
 
@@ -2328,7 +2330,10 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
 
     // Feature-detect whether programmatic volume control is supported.
     // On iOS Safari audio.volume is silently ignored — setting it to 0.5 leaves it at 1.
-    // Use two probes with values far apart so neither can coincidentally equal the real volume.
+    // Two probe values (0.123 and 0.879) are chosen to be far from common default volumes
+    // (0, 0.5, 1.0) so they are unlikely to coincidentally match the real volume, preventing
+    // false negatives. We pick the one that differs from the current volume and verify the
+    // element actually adopted it.
     let _volumeControlSupported = true;
     if (_audioEl) {
       const _prevVol = _audioEl.volume;
@@ -2356,8 +2361,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
           _muteBtn.classList.toggle('muted', _audioEl.muted);
         }
       });
-      // Insert mute button into the bottom bar action row next to the cart button
-      const _actionsRow = document.getElementById('playerCart')?.parentNode;
+      // Insert mute button into the dedicated bottom bar actions container
+      const _actionsRow = document.getElementById('playerActions');
       if (_actionsRow) _actionsRow.appendChild(_muteBtn);
     } else {
       if (_volSlider) _volSlider.value = _savedVolume;
@@ -3700,7 +3705,7 @@ input[type="range"]:focus-visible {
     <i class="fas fa-step-forward" aria-hidden="true"></i>
   </button>
 </div>
-    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+    <div id="playerActions" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
   <button id="playerLike" aria-label="Like this beat" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
     <i class="fas fa-heart" aria-hidden="true"></i>
   </button>
