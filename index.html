@@ -76,6 +76,7 @@
   const BEAT_PRICE = 19.99;           // Standard license price
   const LIKE_BUTTON_SELECTOR = '.like-sm[data-beat-id], .like-btn-track[data-beat-id]';
   const CART_BUTTON_SELECTOR = '.cart-sm[data-beat-id], .cart-btn-track[data-beat-id]';
+  const LIKE_COLOR_ACTIVE = '#22c55e'; // green used for active like buttons
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
@@ -375,6 +376,13 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     el.addEventListener('animationend', () => el.classList.remove('cart-add-animation'), { once: true });
   }
 
+  // Returns all cart buttons on the page for a specific beat
+  function getCartButtonsForBeat(beatId) {
+    return document.querySelectorAll(
+      `.cart-sm[data-beat-id="${beatId}"], .cart-btn-track[data-beat-id="${beatId}"]`
+    );
+  }
+
   function addToCart(beatId) {
     const beat = getBeat(beatId);
     if (!beat) return;
@@ -386,8 +394,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     updateCartBadge();
     showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
     // Animate all cart buttons for this beat and the player cart icon
-    const _cartBeatSelector = CART_BUTTON_SELECTOR.split(', ').map(s => s.replace('[data-beat-id]', `[data-beat-id="${beatId}"]`)).join(', ');
-    document.querySelectorAll(_cartBeatSelector).forEach(triggerCartAnimation);
+    getCartButtonsForBeat(beatId).forEach(triggerCartAnimation);
     triggerCartAnimation(document.getElementById('playerAddToCart'));
   }
 
@@ -684,12 +691,12 @@ function renderCard(beat, index, queue) {
   
   const playerLike = document.getElementById('playerLike');
   if (playerLike) {
-    playerLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+    playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   const fullLike = document.getElementById('fullPlayerLike');
   if (fullLike) {
-    fullLike.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+    fullLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   // LOAD AND PLAY AUDIO
@@ -1198,8 +1205,8 @@ function renderCard(beat, index, queue) {
           return;
         }
         const beatId = parseInt(btn.dataset.beatId);
-        toggleLike(beatId);
-        updateUI();
+        btn.classList.toggle('liked'); // optimistic immediate feedback
+        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     });
 
@@ -1575,13 +1582,13 @@ if (featuredSorted.length > 0) {
       if (playerLike) {
         const liked = isLiked(state.currentBeat.id);
         playerLike.classList.toggle('liked', liked);
-        playerLike.style.color = liked ? '#22c55e' : '';
+        playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : '';
       }
       const fullPlayerLike = document.getElementById('fullPlayerLike');
       if (fullPlayerLike) {
         const liked = isLiked(state.currentBeat.id);
         fullPlayerLike.classList.toggle('liked', liked);
-        fullPlayerLike.style.color = liked ? '#22c55e' : '';
+        fullPlayerLike.style.color = liked ? LIKE_COLOR_ACTIVE : '';
       }
     }
   }
@@ -1628,7 +1635,7 @@ function syncFullPlayer() {
   const likeBtn = document.getElementById('fullPlayerLike');
   if (likeBtn) {
     likeBtn.classList.toggle('liked', isLiked(beat.id));
-    likeBtn.style.color = isLiked(beat.id) ? '#22c55e' : 'var(--text-muted)';
+    likeBtn.style.color = isLiked(beat.id) ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
   }
   
   // Sync progress
@@ -1909,7 +1916,8 @@ function attachBeatCardEvents() {
           showToast('Please sign in to like beats', 'fa-sign-in-alt');
           return;
         }
-        toggleLike(beatId);
+        likeBtn.classList.toggle('liked'); // optimistic immediate feedback
+        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     }
     
@@ -2265,7 +2273,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         const likeBtn = document.getElementById('fullPlayerLike');
         if (likeBtn) {
           const liked = isLiked(state.currentBeat.id);
-          likeBtn.style.color = liked ? '#22c55e' : 'var(--text-muted)';
+          likeBtn.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
           likeBtn.classList.toggle('liked', liked);
         }
       }
@@ -2337,6 +2345,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     let _volumeControlSupported = true;
     if (_audioEl) {
       const _prevVol = _audioEl.volume;
+      // 0.123 and 0.879: chosen to avoid common default volumes (0, 0.5, 1.0)
+      // and far enough apart that neither will coincide with a real saved volume
       const _probeA = 0.123, _probeB = 0.879;
       const _probe = (_prevVol !== _probeA) ? _probeA : _probeB;
       _audioEl.volume = _probe;
