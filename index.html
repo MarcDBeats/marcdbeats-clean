@@ -62,6 +62,8 @@
   const AIRTABLE_API_KEY = 'patBKZiLmkE0gKJUw.900d727f261dba00b44ed7196327030a6efd35250f6e8a7c5c8b02df5bb63cef';
   const AIRTABLE_BASE_ID = 'appygG2TL3no2ivmU';
   const AIRTABLE_TABLE_NAME = 'Beats';
+  const BEAT_PRICE = 19.99;           // Standard license price
+  const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
   // =============================================================
   // 📦 SUPABASE CONFIG
@@ -368,7 +370,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       const cached = localStorage.getItem('marcdbeats_beats_cache');
       if (cached) {
         const { beats: cachedBeats, ts } = JSON.parse(cached);
-        if (Date.now() - ts < 10 * 60 * 1000 && cachedBeats && cachedBeats.length > 0) {
+        if (Date.now() - ts < CACHE_DURATION_MS && cachedBeats && cachedBeats.length > 0) {
           console.log('✅ Using localStorage cache');
           state.beats = cachedBeats;
           state.featured = cachedBeats.filter(b => b.featured === true).sort((a, b) => (a.Order || 999) - (b.Order || 999));
@@ -852,7 +854,7 @@ function renderCard(beat, index, queue) {
     let total = 0;
     modalBox.innerHTML = `
       <h2>Your Cart (${state.cart.length})</h2>
-      <p class="sub">Each license is $19.99</p>
+      <p class="sub">Each license is $${BEAT_PRICE.toFixed(2)}</p>
       ${state.cart.map(beat => `
   <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -861,7 +863,7 @@ function renderCard(beat, index, queue) {
         <div style="font-size:13px;color:var(--text-muted);">${beat.artist}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:15px;font-weight:600;color:var(--accent);">$19.99</span>
+        <span style="font-size:15px;font-weight:600;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</span>
         <button class="cart-item-remove" data-beat-id="${beat.id}" style="background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:4px 6px;">
           <i class="fas fa-times"></i>
         </button>
@@ -880,7 +882,7 @@ function renderCard(beat, index, queue) {
     `;
 
     function updateCartTotal() {
-      const total = state.cart.length * 19.99;
+      const total = state.cart.length * BEAT_PRICE;
       const el = document.getElementById('cartTotal');
       if (el) el.textContent = `$${total.toFixed(2)}`;
     }
@@ -1603,7 +1605,7 @@ function renderBeatStore() {
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
       <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        $19.99
+        \${BEAT_PRICE.toFixed(2)}
       </button>
       <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
         <i class="fas fa-heart"></i>
@@ -1733,7 +1735,7 @@ function renderSamples() {
     <div class="beat-card-actions">
       <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
       <button class="buy-sm" data-beat-id="${beat.id}" style="background:var(--gradient-1);color:#fff;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-        $19.99
+        \${BEAT_PRICE.toFixed(2)}
       </button>
       <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
         <i class="fas fa-heart"></i>
@@ -1886,7 +1888,7 @@ function showCheckoutModal(beat) {
     <p class="sub">You're about to purchase a license for "${beat.title}"</p>
     
     <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
-      <div style="font-size:48px;font-weight:800;color:var(--accent);">$19.99</div>
+      <div style="font-size:48px;font-weight:800;color:var(--accent);">\${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
@@ -1896,7 +1898,7 @@ function showCheckoutModal(beat) {
     </div>
 
     <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Pay $19.99
+      <i class="fas fa-lock"></i> Pay $\${BEAT_PRICE.toFixed(2)}
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
