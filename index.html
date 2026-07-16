@@ -1287,7 +1287,13 @@ function renderCard(beat, index, queue) {
       const beatId = parseInt(item.dataset.beatId, 10);
       if (isNaN(beatId)) return;
 
-      const beatIndex = playlist.beats.findIndex(track => track.id === beatId);
+      let beatIndex = -1;
+      for (let i = 0; i < playlist.beats.length; i += 1) {
+        if (playlist.beats[i].id === beatId) {
+          beatIndex = i;
+          break;
+        }
+      }
       if (beatIndex === -1) return;
 
       const beat = playlist.beats[beatIndex];
@@ -1953,12 +1959,10 @@ function attachBeatCardEvents() {
     const beatId = parseInt(card.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
-    const beat = getBeat(beatId);
-    if (!beat) return;
-
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
 
+    const beat = beatStoreQueue[index];
     renderCard(beat, index, beatStoreQueue);
   });
 
