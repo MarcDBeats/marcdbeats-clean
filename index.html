@@ -1297,7 +1297,7 @@ function renderCard(beat, index, queue) {
       const beatId = parseInt(item.dataset.beatId, 10);
       if (isNaN(beatId)) return;
 
-      const beatIndex = playlist.beats.findIndex(track => track.id === beatId);
+      const beatIndex = playlist.beats.findIndex(beat => beat.id === beatId);
       if (beatIndex === -1) return;
 
       const beat = playlist.beats[beatIndex];
@@ -1939,7 +1939,7 @@ function renderSamples() {
 function attachBeatCardEvents() {
   let grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
-  const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
+  const beatStoreQueue = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
 
   const clonedGrid = grid.cloneNode(true);
   grid.parentNode.replaceChild(clonedGrid, grid);
@@ -1962,7 +1962,7 @@ function attachBeatCardEvents() {
     const beatId = parseInt(card.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
-    const index = beatStoreQueue.findIndex(b => b.id === beatId);
+    const index = beatStoreQueue.findIndex(beat => beat.id === beatId);
     if (index === -1) return;
 
     const beat = beatStoreQueue[index];
