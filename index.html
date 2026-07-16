@@ -419,6 +419,12 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       badge.textContent = state.cart.length;
       badge.style.display = state.cart.length > 0 ? 'flex' : 'none';
     }
+    // Sync desktop sidebar cart badge
+    const sidebarBadge = document.getElementById('sidebarCartBadge');
+    if (sidebarBadge) {
+      sidebarBadge.textContent = state.cart.length;
+      sidebarBadge.style.display = state.cart.length > 0 ? 'inline-flex' : 'none';
+    }
   }
 
   // =============================================================
@@ -653,6 +659,9 @@ function renderCard(beat, index, queue) {
   state.currentIndex = index;
   state.currentBeat = beat;
 
+  // Highlight this beat across all list views
+  updateNowPlayingUI(beat.id);
+
   // Reset progress bars whenever a new beat is selected
   const _prog = document.getElementById('progressSlider');
   const _fullProg = document.getElementById('fullProgressSlider');
@@ -741,6 +750,17 @@ function renderCard(beat, index, queue) {
     logger.warn('audio:no-mp3', { beat: beat.title });
   }
 }
+
+  // =============================================================
+  // 🎯 NOW PLAYING — highlight the current beat across all lists
+  // =============================================================
+  function updateNowPlayingUI(beatId) {
+    // Ensure beatId is a safe integer before interpolating into a CSS selector
+    const safeId = parseInt(beatId, 10);
+    if (isNaN(safeId)) return;
+    document.querySelectorAll('.beat-card.playing, .track-item.playing').forEach(el => el.classList.remove('playing'));
+    document.querySelectorAll(`.beat-card[data-beat-id="${safeId}"], .track-item[data-beat-id="${safeId}"]`).forEach(el => el.classList.add('playing'));
+  }
 
   // =============================================================
   // 🔄 NAVIGATION FUNCTIONS
@@ -1450,8 +1470,10 @@ function renderCard(beat, index, queue) {
   // 🔄 TAB SWITCHING
   // =============================================================
   function switchTab(tab) {
-  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.tab-nav button[data-tab="${tab}"]`)?.classList.add('active');
+  // Sync all tab navigation elements: top nav, desktop sidebar, mobile bottom nav
+  document.querySelectorAll('.tab-nav button, .sidebar-nav-btn[data-tab], .bottom-nav-btn[data-tab]').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
 
   document.querySelectorAll('.tab-content').forEach(v => v.classList.remove('active'));
   document.getElementById(`${tab}Content`)?.classList.add('active');
@@ -1689,6 +1711,7 @@ function renderBeatStore() {
   <div class="beat-card" data-beat-id="${beat.id}">
     <div class="beat-card-art">
       <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
+      <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
     </div>
     <div class="beat-card-info">
       <div class="beat-card-title">${beat.title}</div>
@@ -1817,6 +1840,7 @@ function renderSamples() {
   <div class="beat-card" data-beat-id="${beat.id}">
     <div class="beat-card-art">
       <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
+      <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
     </div>
     <div class="beat-card-info">
       <div class="beat-card-title">${beat.title}</div>
@@ -1849,6 +1873,7 @@ function renderSync() {
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
         <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
+        <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
         <span class="featured-badge">🎬</span>
       </div>
       <div class="beat-card-info">
@@ -2073,15 +2098,8 @@ function showCheckoutModal(beat) {
 
 // Home button (cursive text) goes to Beat Store
 document.getElementById('homeNavBtn')?.addEventListener('click', () => {
-  // Switch to Beat Store tab
-  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-  document.querySelector('.tab-nav button[data-tab="beatstore"]')?.classList.add('active');
-  
-  document.querySelectorAll('.tab-content').forEach(v => v.classList.remove('active'));
-  document.getElementById('beatstoreContent')?.classList.add('active');
-  
-  renderBeatStore();
   closeAllViews();
+  switchTab('beatstore');
 });
     document.getElementById('termsNavBtn')?.addEventListener('click', showTerms);
     document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
@@ -2239,8 +2257,35 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       if (e.key === 'c' || e.key === 'C') {
         document.getElementById('cartBtn')?.click();
       }
+      if (e.key === 'f' || e.key === 'F') {
+        if (state.currentBeat) openFullPlayer();
+      }
     });
     
+    // ---- Desktop sidebar navigation ----
+    document.querySelectorAll('.sidebar-nav-btn[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeAllViews();
+        switchTab(btn.dataset.tab);
+      });
+    });
+    document.getElementById('sidebarCartBtn')?.addEventListener('click', renderCartModal);
+    document.getElementById('sidebarAuthBtn')?.addEventListener('click', () => {
+      if (isLoggedIn()) showPortal(); else showAuthModal();
+    });
+    document.querySelector('.sidebar-brand')?.addEventListener('click', () => {
+      closeAllViews();
+      switchTab('beatstore');
+    });
+
+    // ---- Mobile bottom navigation ----
+    document.querySelectorAll('.bottom-nav-btn[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeAllViews();
+        switchTab(btn.dataset.tab);
+      });
+    });
+
     init();
     logger.info('app:init-called');
 
@@ -2435,12 +2480,17 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       --accent: #dc2626;
       --accent-hover: #ef4444;
       --accent-glow: rgba(220, 38, 38, 0.3);
+      --accent-subtle: rgba(220, 38, 38, 0.12);
+      --accent-border: rgba(220, 38, 38, 0.3);
       --text-primary: #ffffff;
       --text-secondary: #b3b3b3;
       --text-muted: #6b6b6b;
       --border-subtle: rgba(255, 255, 255, 0.06);
       --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.8);
+      --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.5);
       --radius-card: 20px;
+      --sidebar-width: 220px;
+      --bottom-nav-height: 56px;
       --like-color-active: #22c55e; /* synced with JS LIKE_COLOR_ACTIVE constant */
     }
     html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: none; user-select: none; }
@@ -3580,12 +3630,444 @@ input[type="range"]:focus-visible {
 .mute-toggle-btn.muted {
   color: var(--accent);
 }
+/* ===== DESKTOP SIDEBAR ===== */
+.desktop-sidebar {
+  display: none;
+}
+
+.sidebar-header {
+  padding: 24px 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: block;
+}
+
+.sidebar-brand:hover { opacity: 0.8; }
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  border-radius: 8px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.sidebar-nav-btn i {
+  font-size: 17px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-btn.active {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.sidebar-nav-btn:hover:not(.active) {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-footer {
+  padding: 12px 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sidebar-badge {
+  background: var(--accent);
+  color: white;
+  border-radius: 12px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: auto;
+  align-items: center;
+  display: none; /* shown via JS when cart has items */
+}
+
+/* ===== MOBILE BOTTOM NAVIGATION ===== */
+.mobile-bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: rgba(10, 10, 15, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border-subtle);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  flex-shrink: 0;
+  z-index: 29;
+}
+
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s;
+  min-height: 56px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-btn span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+.bottom-nav-btn.active {
+  color: var(--accent);
+}
+
+.bottom-nav-btn:hover {
+  color: var(--text-secondary);
+}
+
+/* ===== BEAT CARD PLAY OVERLAY ===== */
+.beat-card-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.beat-card-play-overlay i {
+  font-size: 36px;
+  color: white;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  transform: scale(0.85);
+  transition: transform 0.2s;
+}
+
+/* Show overlay on hover (pointer devices only) */
+@media (hover: hover) {
+  .beat-card:hover .beat-card-play-overlay {
+    opacity: 1;
+  }
+  .beat-card:hover .beat-card-play-overlay i {
+    transform: scale(1);
+  }
+}
+
+/* ===== BEAT CARD — TABLET GRID (600–1023px) ===== */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .tab-nav { display: none !important; }
+
+  .beat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .beat-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+
+  .beat-card:hover {
+    border-color: var(--accent-border);
+    background: var(--bg-card-hover);
+  }
+
+  .beat-card-art {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  .beat-card-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+  }
+
+  .beat-card:hover .beat-card-art img { transform: scale(1.04); }
+
+  .beat-card-info { padding: 10px 12px 0; }
+  .beat-card-actions { padding: 6px 12px 10px; }
+}
+
+/* ===== DESKTOP LAYOUT (1024px+) ===== */
+@media (min-width: 1024px) {
+  /* Remove mobile nav bar */
+  .mobile-bottom-nav { display: none; }
+
+  /* Show sidebar */
+  .desktop-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-subtle);
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  /* Push app content to the right of sidebar */
+  .app {
+    max-width: calc(100% - var(--sidebar-width)) !important;
+    margin-left: var(--sidebar-width) !important;
+    margin-right: 0 !important;
+    width: calc(100% - var(--sidebar-width)) !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide original top tab nav */
+  .tab-nav { display: none !important; }
+
+  /* Hide brand from header (it lives in sidebar) */
+  .header-left { display: none; }
+
+  /* Expand header padding */
+  .header { padding: 12px 24px; }
+
+  /* Remove tab-content inner padding (grid handles its own) */
+  .tab-content { padding: 0; }
+
+  /* Beat grid: 3 columns */
+  .beat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  /* Card style */
+  .beat-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .beat-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .beat-card-art {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  .beat-card-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+  }
+
+  .beat-card:hover .beat-card-art img { transform: scale(1.04); }
+
+  .beat-card-info { padding: 12px 14px 4px; }
+
+  .beat-card-title { font-size: 15px; font-weight: 600; }
+
+  .beat-card-artist { font-size: 12px; margin-top: 2px; }
+
+  .beat-card-actions { padding: 8px 14px 12px; gap: 6px; }
+
+  .beat-card-actions button { font-size: 15px; padding: 7px 9px; }
+
+  /* Beat Store search bar inset */
+  .beatstore-search {
+    margin: 16px 20px 0 !important;
+  }
+
+  /* Playlist grid: 3 cols */
+  #beatTapesGrid > .playlist-grid,
+  .playlist-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+
+  #beatTapesGrid {
+    padding: 16px 20px;
+  }
+
+  /* Playlist card hover */
+  .playlist-card {
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s !important;
+  }
+  .playlist-card:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* Player enhancements */
+  .spotify-player { padding: 12px 24px 16px; }
+  #playerArtwork { width: 60px !important; height: 60px !important; border-radius: 10px !important; }
+  #playerTitle { font-size: 15px !important; font-weight: 700 !important; }
+  #playerArtist { font-size: 13px !important; }
+  .volume-row { display: flex !important; }
+
+  /* Portal / terms / playlist detail pane fills the right area */
+  .playlist-detail,
+  .portal-view,
+  .terms-view {
+    z-index: 20;
+  }
+}
+
+/* ===== WIDE DESKTOP: 4 columns (1440px+) ===== */
+@media (min-width: 1440px) {
+  .beat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  #beatTapesGrid > .playlist-grid,
+  .playlist-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* ===== NOW PLAYING INDICATOR ===== */
+.beat-card.playing .beat-card-title {
+  color: var(--accent);
+}
+
+/* Pulsing dot on the artwork */
+.beat-card.playing .beat-card-art::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow), 0 0 20px var(--accent-subtle);
+  animation: beatPulse 1.5s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes beatPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.6; }
+}
+
+.track-item.playing {
+  background: var(--accent-subtle) !important;
+  border-left: 3px solid var(--accent) !important;
+}
+.track-item.playing .title { color: var(--accent); }
+.track-item.playing .track-number { color: var(--accent); }
+
+/* ===== CUSTOM SCROLLBARS ===== */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-glow); }
+
+/* ===== TOAST — raise above mobile bottom nav ===== */
+@media (max-width: 1023px) {
+  .toast { bottom: calc(var(--bottom-nav-height) + 96px); }
+}
+
     
-  </style>
 </head>
 <body>
 
 <div class="app" id="app">
+
+<!-- Desktop Sidebar -->
+<aside class="desktop-sidebar" id="desktopSidebar" aria-label="Main navigation">
+  <div class="sidebar-header">
+    <span class="brand-cursive sidebar-brand">marcdbeats</span>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="sidebar-nav-btn active" data-tab="beatstore">
+      <i class="fas fa-store" aria-hidden="true"></i>
+      <span>Beat Store</span>
+    </button>
+    <button class="sidebar-nav-btn" data-tab="beattapes">
+      <i class="fas fa-compact-disc" aria-hidden="true"></i>
+      <span>Beat Tapes</span>
+    </button>
+    <button class="sidebar-nav-btn" data-tab="samples">
+      <i class="fas fa-music" aria-hidden="true"></i>
+      <span>Samples</span>
+    </button>
+    <button class="sidebar-nav-btn" data-tab="sync">
+      <i class="fas fa-film" aria-hidden="true"></i>
+      <span>Sync</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="sidebar-nav-btn" id="sidebarCartBtn" aria-label="View cart">
+      <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+      <span>Cart</span>
+      <span class="sidebar-badge" id="sidebarCartBadge">0</span>
+    </button>
+    <button class="sidebar-nav-btn" id="sidebarAuthBtn" aria-label="Account">
+      <i class="fas fa-user-circle" aria-hidden="true"></i>
+      <span>Account</span>
+    </button>
+  </div>
+</aside>
 
 <!-- Loading overlay — shown while Airtable data loads -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none;">
@@ -3743,6 +4225,26 @@ input[type="range"]:focus-visible {
 </div>
   </div>
 </div>
+
+<!-- Mobile Bottom Navigation -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Main navigation">
+  <button class="bottom-nav-btn active" data-tab="beatstore" aria-label="Beat Store">
+    <i class="fas fa-store" aria-hidden="true"></i>
+    <span>Store</span>
+  </button>
+  <button class="bottom-nav-btn" data-tab="beattapes" aria-label="Beat Tapes">
+    <i class="fas fa-compact-disc" aria-hidden="true"></i>
+    <span>Tapes</span>
+  </button>
+  <button class="bottom-nav-btn" data-tab="samples" aria-label="Samples">
+    <i class="fas fa-music" aria-hidden="true"></i>
+    <span>Samples</span>
+  </button>
+  <button class="bottom-nav-btn" data-tab="sync" aria-label="Sync">
+    <i class="fas fa-film" aria-hidden="true"></i>
+    <span>Sync</span>
+  </button>
+</nav>
 
 <!-- Full Player Overlay -->
 <div class="full-player-overlay" id="fullPlayerOverlay" role="dialog" aria-modal="true" aria-label="Full player">
