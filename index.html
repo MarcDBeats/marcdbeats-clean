@@ -88,10 +88,12 @@
   // 📦 OPTIONAL EXTERNAL SERVICES
   // =============================================================
   const SUPABASE_URL = 'https://adilswotkpnjcrdvotne.supabase.co';
+  // Browser-safe anonymous key; keep Row Level Security enabled for all writable tables.
   const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
   const supabase = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+  // Browser-safe publishable Stripe key; the secret key must remain server-side only.
   const STRIPE_PUBLISHABLE_KEY = 'pk_live_9tzMrYX8TutSUzuk5VI7XMLD';
   const stripe = window.Stripe ? Stripe(STRIPE_PUBLISHABLE_KEY) : null;
   
@@ -2386,7 +2388,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
       --bottom-nav-height: 56px;
       --like-color-active: #22c55e; /* synced with JS LIKE_COLOR_ACTIVE constant */
     }
-    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: manipulation; user-select: none; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: manipulation; user-select: auto; }
     .app { max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; background: var(--bg-secondary); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0, 0, 0, 0.9); overflow: hidden; }
         /* New Header Layout */
 .header {
