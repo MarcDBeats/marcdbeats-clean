@@ -1507,8 +1507,8 @@ function renderCard(beat, index, queue) {
   // 🔄 TAB SWITCHING
   // =============================================================
   function switchTab(tab) {
-  // Sync all tab navigation elements
-  document.querySelectorAll('.tab-nav button, .sidebar-nav-btn[data-tab], .bottom-nav-btn[data-tab]').forEach(b => {
+  // Sync the top tab nav and desktop sidebar
+  document.querySelectorAll('.tab-nav button, .sidebar-nav-btn[data-tab]').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
 
