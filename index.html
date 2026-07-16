@@ -1276,9 +1276,9 @@ function renderCard(beat, index, queue) {
       </div>
     `).join('');
 
-    const freshTracklist = tracklist.cloneNode(true);
-    tracklist.parentNode.replaceChild(freshTracklist, tracklist);
-    tracklist = freshTracklist;
+    const clonedTracklist = tracklist.cloneNode(true);
+    tracklist.parentNode.replaceChild(clonedTracklist, tracklist);
+    tracklist = clonedTracklist;
 
     tracklist.addEventListener('click', function(e) {
       const item = e.target.closest('.track-item');
@@ -1943,9 +1943,9 @@ function attachBeatCardEvents() {
   if (!grid) return;
   const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
 
-  const newGrid = grid.cloneNode(true);
-  grid.parentNode.replaceChild(newGrid, grid);
-  grid = newGrid;
+  const clonedGrid = grid.cloneNode(true);
+  grid.parentNode.replaceChild(clonedGrid, grid);
+  grid = clonedGrid;
 
   grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
