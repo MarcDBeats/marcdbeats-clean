@@ -424,6 +424,14 @@
     `;
   }
 
+  function updateSearchClearButton() {
+    const button = document.getElementById('beatSearchBtn');
+    if (!button) return;
+    const active = !!state.searchQuery;
+    button.disabled = !active;
+    button.classList.toggle('is-active', active);
+  }
+
   function updateCartButtons() {
     document.querySelectorAll('.cart-action[data-beat-id]').forEach(button => {
       const beatId = parseInt(button.dataset.beatId, 10);
@@ -483,7 +491,7 @@
       const badge = document.getElementById(id);
       if (!badge) return;
       badge.textContent = state.cart.length;
-      badge.style.setProperty('display', state.cart.length > 0 ? 'inline-flex' : 'none', 'important');
+      badge.style.display = state.cart.length > 0 ? 'inline-flex' : 'none';
     });
     updateCartButtons();
   }
@@ -679,6 +687,7 @@ state.playlists = playlistIds.map(id => {
   // =============================================================
   function searchBeats(query) {
     state.searchQuery = (query || '').trim();
+    updateSearchClearButton();
     renderBeatStore();
   }
 
@@ -1264,7 +1273,7 @@ function renderCard(beat, index, queue) {
         const beatId = parseInt(item.dataset.beatId, 10);
         const beat = playlist.beats.find(track => track.id === beatId);
         if (beat) {
-          renderCard(beat, state.beats.indexOf(beat), beats);
+          renderCard(beat, beats.indexOf(beat), beats);
           updateNowPlayingUI(beat.id);
         }
       });
@@ -1834,6 +1843,7 @@ function renderSamples() {
 function renderBeatStore() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
+  updateSearchClearButton();
 
   const beats = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
   if (beats.length === 0) {
@@ -1948,6 +1958,7 @@ function renderSamples() {
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
+  const beatStoreQueue = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
   document.querySelectorAll('.beat-card').forEach(card => {
     const freshCard = card.cloneNode(true);
     card.replaceWith(freshCard);
@@ -1956,7 +1967,7 @@ function attachBeatCardEvents() {
     freshCard.addEventListener('click', event => {
       if (event.target.closest('button')) return;
       const beat = getBeat(beatId);
-      if (beat) renderCard(beat, state.beats.indexOf(beat), getBeatStoreBeats());
+      if (beat) renderCard(beat, beatStoreQueue.indexOf(beat), beatStoreQueue);
     });
 
     freshCard.querySelector('.cart-action')?.addEventListener('click', event => {
@@ -2831,7 +2842,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
   box-shadow: 0 6px 24px rgba(220, 38, 38, 0.4) !important;
 }
     .cart-badge {
-  display: none !important;
+  display: none;
 }
 
 /* Global button improvements */
@@ -3943,6 +3954,15 @@ input[type="range"]:focus-visible {
   background: rgba(220, 38, 38, 0.14);
   border-color: var(--accent-border);
   color: #fff;
+}
+.beat-search-btn {
+  opacity: 0.45;
+}
+.beat-search-btn.is-active {
+  opacity: 1;
+}
+.beat-search-btn:disabled {
+  cursor: default !important;
 }
 
 .beat-grid {
