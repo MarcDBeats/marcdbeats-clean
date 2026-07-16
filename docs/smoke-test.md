@@ -78,7 +78,7 @@ Open the app in a browser. Keep DevTools **Console** visible. You should see `[M
 | Remove an item | Item disappears and total updates instantly |
 | Empty the cart | Empty-state messaging appears with license note |
 | Open checkout preview from cart | No sign-in prompt appears |
-| Checkout preview | Shows standard-license terms, pricing, and exclusive-beat contact note |
+| Checkout preview | Shows standard-license terms, pricing, and the exclusive-beats email contact note (`admin@marcdbeats.com`) |
 | Payment button | Shows payment is coming soon instead of opening live processing |
 
 ---
@@ -96,7 +96,7 @@ Test these viewport sizes:
 
 | Check | Expected result |
 |-------|----------------|
-| Tabs, search, and cards | No horizontal overflow |
+| Tabs, search, and cards | No horizontal overflow, and no bottom mobile nav appears |
 | Beat cards | Tap targets remain comfortable on small screens |
 | Mini player | Opens full player easily and controls are not clipped |
 | Full player | Artwork, controls, volume slider, and actions remain visible |
