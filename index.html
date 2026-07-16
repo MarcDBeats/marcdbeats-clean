@@ -85,7 +85,7 @@
   const SUPABASE_URL = 'https://adilswotkpnjcrdvotne.supabase.co';
   // Browser-safe anonymous key; keep Row Level Security enabled for all writable tables.
   const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
-  const supabase = window.supabase?.createClient
+  const supabaseClient = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
   // Browser-safe publishable Stripe key; the secret key must remain server-side only.
@@ -254,7 +254,7 @@
   // =============================================================
   async function signUp(email, password, username) {
   try {
-    const { data, error } = await supabase.auth.signUp({ 
+    const { data, error } = await supabaseClient.auth.signUp({ 
       email, 
       password,
       options: {
@@ -276,7 +276,7 @@
 
   async function signIn(email, password) {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
       state.user = data.user;
       state.isGuest = false;
@@ -292,7 +292,7 @@
 
   async function signOut() {
     try {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       state.user = null;
       state.isGuest = true;
       state.likes = [];
@@ -311,13 +311,13 @@
   async function loadUserData() {
     if (!state.user) return;
     try {
-      const { data: likesData, error: likesError } = await supabase
+      const { data: likesData, error: likesError } = await supabaseClient
         .from('likes')
         .select('beat_id')
         .eq('member_id', state.user.id);
       if (!likesError) state.likes = likesData.map(l => l.beat_id);
 
-      const { data: purchasesData, error: purchasesError } = await supabase
+      const { data: purchasesData, error: purchasesError } = await supabaseClient
         .from('purchases')
         .select('*')
         .eq('member_id', state.user.id);
@@ -337,7 +337,7 @@
     const isLikedNow = isLiked(beatId);
     try {
       if (isLikedNow) {
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('likes')
           .delete()
           .eq('member_id', state.user.id)
@@ -347,7 +347,7 @@
           showToast('Removed like', 'fa-heart-broken');
         }
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('likes')
           .insert({ member_id: state.user.id, beat_id: beatId });
         if (!error) {
@@ -1567,9 +1567,9 @@ function renderCard(beat, index, queue) {
   async function init() {
     console.log('=== INIT STARTING ===');
     
-    if (supabase) {
+    if (supabaseClient) {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await supabaseClient.auth.getSession();
         if (data.session) {
           state.user = data.session.user;
           state.isGuest = false;
