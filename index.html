@@ -366,8 +366,7 @@
       updateUI();
     } catch (error) {
       showToast(error.message, 'fa-exclamation-circle');
-      // Revert optimistic UI update on failure
-      syncAllLikeButtons();
+      updateUI();
     }
   }
 
@@ -499,7 +498,6 @@
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
-    renderSync();
     updateUI();
     return;
   }
@@ -542,7 +540,7 @@
           });
           state.loaded = true;
           state.dataLoaded = true;
-          renderBeatStore(); renderBeatTapes(); renderSamples(); renderSync(); updateUI();
+          renderBeatStore(); renderBeatTapes(); renderSamples(); updateUI();
           hideLoadingSpinner();
           return;
         } else {
@@ -600,7 +598,6 @@
       renderBeatStore();
       renderBeatTapes();
       renderSamples();
-      renderSync();
       updateUI();
       showToast('No beats found in Airtable', 'fa-exclamation-circle');
       return;
@@ -664,7 +661,6 @@ state.playlists = playlistIds.map(id => {
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
-    renderSync();
     updateUI();
     hideLoadingSpinner();
 
@@ -1605,7 +1601,6 @@ if (featuredSorted.length > 0) {
     updateCartBadge();
     updateCartButtons();
   }
-  function syncAllLikeButtons() {}
 // =============================================================
 // 📱 FULL PLAYER
 // =============================================================
@@ -1836,40 +1831,6 @@ function renderSamples() {
   attachBeatCardEvents();
 }
 
-function renderSync() {
-  const grid = document.getElementById('syncGrid');
-  if (!grid) return;
-  
-  const syncBeats = state.beats.filter(b => b.featured === true);
-  if (syncBeats.length === 0) {
-    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No sync beats yet</div>`;
-    return;
-  }
-  
-  grid.innerHTML = syncBeats.map(beat => `
-    <div class="beat-card" data-beat-id="${beat.id}">
-      <div class="beat-card-art">
-        <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
-        <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
-        <span class="featured-badge">🎬</span>
-      </div>
-      <div class="beat-card-info">
-        <div class="beat-card-title">${beat.title}</div>
-        <div class="beat-card-artist">${beat.artist}</div>
-      </div>
-      <div class="beat-card-actions">
-        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
-        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
-          <i class="fas fa-heart"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
-  
-  attachBeatCardEvents();
-}
-
 function renderBeatStore() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
@@ -1985,9 +1946,6 @@ function renderSamples() {
   renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
 }
 
-function renderSync() {
-  return;
-}
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
   document.querySelectorAll('.beat-card').forEach(card => {

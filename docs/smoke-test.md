@@ -87,12 +87,12 @@ Open the app in a browser. Keep DevTools **Console** visible. You should see `[M
 
 Test these viewport sizes:
 
-- **375 × 667** (iPhone)
-- **390 × 844** (modern phone)
-- **360 × 780** (Android)
-- **375 × 500** (very short screen)
-- **768 × 1024** and **1024 × 768** (iPad portrait/landscape)
-- **1280 × 800** and wider desktop
+- **375 × 667 px** (iPhone)
+- **390 × 844 px** (modern phone)
+- **360 × 780 px** (Android)
+- **375 × 500 px** (very short screen)
+- **768 × 1024 px** and **1024 × 768 px** (iPad portrait/landscape)
+- **1280 × 800 px** and wider desktop
 
 | Check | Expected result |
 |-------|----------------|
