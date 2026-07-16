@@ -1281,6 +1281,15 @@ function renderCard(beat, index, queue) {
     tracklist = clonedTracklist;
 
     tracklist.addEventListener('click', function(e) {
+      const cartBtn = e.target.closest('.cart-action');
+      if (cartBtn) {
+        e.stopPropagation();
+        const beatId = parseInt(cartBtn.dataset.beatId, 10);
+        if (isNaN(beatId)) return;
+        addToCart(beatId);
+        return;
+      }
+
       const item = e.target.closest('.track-item');
       if (!item) return;
       if (e.target.closest('button')) return;
@@ -1294,17 +1303,6 @@ function renderCard(beat, index, queue) {
       const beat = playlist.beats[beatIndex];
       renderCard(beat, beatIndex, playlist.beats);
       updateNowPlayingUI(beat.id);
-    });
-
-    tracklist.addEventListener('click', function(e) {
-      const cartBtn = e.target.closest('.cart-action');
-      if (!cartBtn) return;
-
-      e.stopPropagation();
-      const beatId = parseInt(cartBtn.dataset.beatId, 10);
-      if (isNaN(beatId)) return;
-
-      addToCart(beatId);
     });
 
     document.getElementById('playlistDetail').classList.add('active');
@@ -1948,6 +1946,15 @@ function attachBeatCardEvents() {
   grid = clonedGrid;
 
   grid.addEventListener('click', function(e) {
+    const cartBtn = e.target.closest('.cart-action');
+    if (cartBtn) {
+      e.stopPropagation();
+      const beatId = parseInt(cartBtn.dataset.beatId, 10);
+      if (isNaN(beatId)) return;
+      addToCart(beatId);
+      return;
+    }
+
     const card = e.target.closest('.beat-card');
     if (!card) return;
     if (e.target.closest('button')) return;
@@ -1960,17 +1967,6 @@ function attachBeatCardEvents() {
 
     const beat = beatStoreQueue[index];
     renderCard(beat, index, beatStoreQueue);
-  });
-
-  grid.addEventListener('click', function(e) {
-    const cartBtn = e.target.closest('.cart-action');
-    if (!cartBtn) return;
-
-    e.stopPropagation();
-    const beatId = parseInt(cartBtn.dataset.beatId, 10);
-    if (isNaN(beatId)) return;
-
-    addToCart(beatId);
   });
 
   updateCartButtons();
