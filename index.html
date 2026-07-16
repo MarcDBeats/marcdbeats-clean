@@ -1507,8 +1507,8 @@ function renderCard(beat, index, queue) {
   // 🔄 TAB SWITCHING
   // =============================================================
   function switchTab(tab) {
-  // Sync the top tab nav and desktop sidebar
-  document.querySelectorAll('.tab-nav button, .sidebar-nav-btn[data-tab]').forEach(b => {
+  // Sync top tabs, desktop sidebar, and mobile bottom nav
+  document.querySelectorAll('.tab-nav button, .sidebar-nav-btn[data-tab], .bottom-nav-btn[data-tab]').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
 
@@ -1677,43 +1677,6 @@ function syncFullPlayer() {
 // =============================================================
 // 📱 OFFTOP-STYLE RENDER FUNCTIONS
 // =============================================================
-
-function renderBeatStore() {
-  const grid = document.getElementById('beatStoreGrid');
-  if (!grid) return;
-  
-  const beats = state.beats
-  .filter(b => b.featured === true)
-  .sort((a, b) => (a.Order || 999) - (b.Order || 999));
-  if (beats.length === 0) {
-    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No featured beats yet</div>`;
-    return;
-  }
-  
-  grid.innerHTML = beats.map(beat => `
-  <div class="beat-card" data-beat-id="${beat.id}">
-    <div class="beat-card-art">
-      <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
-      <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
-    </div>
-    <div class="beat-card-info">
-      <div class="beat-card-title">${beat.title}</div>
-      <div class="beat-card-artist">${beat.artist}</div>
-    </div>
-    <div class="beat-card-actions">
-      <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-      <button class="cart-sm" data-beat-id="${beat.id}" aria-label="Add to cart"><i class="fas fa-cart-plus"></i></button>
-      <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}" aria-label="Like this beat">
-        <i class="fas fa-heart"></i>
-      </button>
-    </div>
-  </div>
-`).join('');
-  
-  // Add event listeners with a tiny delay
-setTimeout(attachBeatCardEvents, 50);
-  state.currentPlaylist = 'featured';
-}
 
 function renderBeatTapes() {
   const grid = document.getElementById('beatTapesGrid');
@@ -4432,6 +4395,21 @@ input[type="range"]:focus-visible {
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal-box" id="modalBox"></div>
   </div>
+
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <button type="button" class="bottom-nav-btn active" data-tab="beatstore" aria-label="Beat Store">
+      <i class="fas fa-store" aria-hidden="true"></i>
+      <span>Store</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" data-tab="beattapes" aria-label="Beat Tapes">
+      <i class="fas fa-compact-disc" aria-hidden="true"></i>
+      <span>Tapes</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" data-tab="samples" aria-label="Samples">
+      <i class="fas fa-music" aria-hidden="true"></i>
+      <span>Samples</span>
+    </button>
+  </nav>
 
 
 
