@@ -1257,7 +1257,7 @@ function renderCard(beat, index, queue) {
     document.getElementById('detailTitle').textContent = playlist.name;
     document.getElementById('detailCount').textContent = `${beats.length} beats`;
 
-    const tracklist = document.getElementById('detailTracklist');
+    let tracklist = document.getElementById('detailTracklist');
     if (!tracklist) return;
 
     tracklist.innerHTML = beats.map((beat, i) => `
@@ -1278,8 +1278,9 @@ function renderCard(beat, index, queue) {
 
     const freshTracklist = tracklist.cloneNode(true);
     tracklist.parentNode.replaceChild(freshTracklist, tracklist);
+    tracklist = freshTracklist;
 
-    freshTracklist.addEventListener('click', function(e) {
+    tracklist.addEventListener('click', function(e) {
       const item = e.target.closest('.track-item');
       if (!item) return;
       if (e.target.closest('button')) return;
@@ -1287,13 +1288,7 @@ function renderCard(beat, index, queue) {
       const beatId = parseInt(item.dataset.beatId, 10);
       if (isNaN(beatId)) return;
 
-      let beatIndex = -1;
-      for (let i = 0; i < playlist.beats.length; i += 1) {
-        if (playlist.beats[i].id === beatId) {
-          beatIndex = i;
-          break;
-        }
-      }
+      const beatIndex = playlist.beats.findIndex(track => track.id === beatId);
       if (beatIndex === -1) return;
 
       const beat = playlist.beats[beatIndex];
@@ -1301,7 +1296,7 @@ function renderCard(beat, index, queue) {
       updateNowPlayingUI(beat.id);
     });
 
-    freshTracklist.addEventListener('click', function(e) {
+    tracklist.addEventListener('click', function(e) {
       const cartBtn = e.target.closest('.cart-action');
       if (!cartBtn) return;
 
@@ -1944,14 +1939,15 @@ function renderSamples() {
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
-  const grid = document.getElementById('beatStoreGrid');
+  let grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
   const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
 
   const newGrid = grid.cloneNode(true);
   grid.parentNode.replaceChild(newGrid, grid);
+  grid = newGrid;
 
-  newGrid.addEventListener('click', function(e) {
+  grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
     if (!card) return;
     if (e.target.closest('button')) return;
@@ -1966,7 +1962,7 @@ function attachBeatCardEvents() {
     renderCard(beat, index, beatStoreQueue);
   });
 
-  newGrid.addEventListener('click', function(e) {
+  grid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
 
