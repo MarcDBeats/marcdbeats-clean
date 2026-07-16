@@ -1,12 +1,12 @@
 # MarcDBeats — Manual Smoke Test Checklist
 
-A concise, under-10-minute test you can run after any significant change to verify nothing is broken.
+A concise test you can run after storefront UI changes.
 
 ---
 
 ## Setup
 
-Open the app in a browser. Open DevTools **Console** tab (⌥⌘I on Mac, F12 on Windows) and keep it visible throughout. You should see `[MDB] app:dom-ready` logged on load. Any `[MDB] ❌` lines indicate errors.
+Open the app in a browser. Keep DevTools **Console** visible. You should see `[MDB] app:dom-ready` on load. Any `[MDB] ❌` entries indicate a regression.
 
 ---
 
@@ -15,122 +15,108 @@ Open the app in a browser. Open DevTools **Console** tab (⌥⌘I on Mac, F12 on
 | Step | Expected result |
 |------|----------------|
 | Open app cold (first visit / incognito) | Loading spinner appears, then beats render. Console shows `[MDB] fetch:start` → `[MDB] fetch:success` → `[MDB] cache:saved` |
-| Reload the page | Console shows `[MDB] cache:hit` with `ageSecs < 600`. Beats render immediately, no spinner |
-| In DevTools → Application → Local Storage, delete `marcdbeats_beats_cache`, then reload | Console shows `[MDB] cache:cold`, fetches fresh data |
-| Manually edit the cache in Local Storage and change `"version":"v1"` to `"version":"v0"`, then reload | Console shows `[MDB] cache:invalidated { reason: "version-mismatch" }`, fetches fresh data |
-| Manually edit the cache and set `"createdAt"` to `0`, then reload | Console shows `[MDB] cache:invalidated { reason: "expired-or-corrupt" }`, fetches fresh data |
+| Reload the page | Console shows `[MDB] cache:hit` with `ageSecs < 600`. Beats render without a fresh fetch |
+| Delete `marcdbeats_beats_cache` in Local Storage, then reload | Console shows `[MDB] cache:cold`, then fetches fresh data |
+| Change cache `version` from `v1` to `v0`, then reload | Console shows `[MDB] cache:invalidated { reason: "version-mismatch" }` |
 
 ---
 
-## 2 · Playback controls — mini player
+## 2 · Beat Store
 
 | Step | Expected result |
 |------|----------------|
-| Click any beat card | Beat loads in mini player; title + artist update |
-| Click ▶ Play | Music plays; button changes to ⏸ Pause |
-| Click ⏸ Pause | Music pauses; button changes to ▶ Play |
-| Click ⏭ Next | Advances to next beat in queue; title updates |
-| Click ⏮ Prev | Goes back to previous beat |
-| Drag the progress slider | Audio seeks to the dragged position |
-| Drag the volume slider | Volume changes; slider position persists on reload |
-| Let a beat play to the end | Next beat starts automatically |
+| Confirm top tabs | Only **Beat Store**, **Beat Tapes**, and **Samples** appear |
+| Click a beat card (not the cart button) | The beat starts playing and the mini player updates |
+| Click **Add to Cart** on a beat card | Cart badge count increases immediately; button changes to added state |
+| Type into search | Beat Store filters in real time as you type |
+| Search for a term with no matches | Grid shows a clear no-results empty state |
+| Click the clear-search button | Search resets and the full beat list returns |
 
 ---
 
-## 3 · Full player (mobile — viewport ≤ 768 px)
+## 3 · Beat Tapes
 
 | Step | Expected result |
 |------|----------------|
-| Tap the mini player (not a button) | Full player overlay opens with artwork, title, artist |
-| Full player shows correct track info | Same beat as mini player |
-| ▶/⏸ button in full player | Syncs with mini player play state |
-| ⏮ / ⏭ in full player | Navigates beats; both players stay in sync |
-| Drag full player progress slider | Seeks audio |
-| Swipe down on full player | Overlay closes |
-| Tap ✕ close button | Overlay closes |
+| Open **Beat Tapes** | Series are stacked vertically |
+| Tap a series header | The series expands/collapses |
+| Expanded series with many entries | Only an initial batch shows, with **Load more** available when needed |
+| Tap a playlist/tape entry | Playlist detail opens |
+| Tap a track row | The beat starts playing |
+| Tap the track cart button | Universal cart badge updates immediately |
 
 ---
 
-## 4 · Cart
+## 4 · Samples
 
 | Step | Expected result |
 |------|----------------|
-| Click ➕ Add to Cart on a beat | Toast "Added … to cart" appears |
-| Click the 🛒 Cart button in header | Cart modal opens with correct beat and `$19.99` |
-| Total shown at bottom | Equals `(number of items) × $19.99` |
-| Remove a beat from cart | Beat disappears; total updates |
-| Add the same beat twice | Toast "Already in cart" — no duplicate |
-| Empty cart, open cart modal | Shows "Your cart is empty" message |
+| Open **Samples** | A clean empty state says **Samples coming soon** |
 
 ---
 
-## 5 · Loading & error states
+## 5 · Mini player + full player
 
 | Step | Expected result |
 |------|----------------|
-| Open app on a slow connection (DevTools → Network → Slow 3G) | Spinner is visible while data loads |
-| Disconnect network and reload | Error toast appears; spinner hides; no crash |
-| Reconnect and reload | Normal load resumes |
+| Mini player is visible | Like button, cart button, add-to-cart button, and volume slider are absent |
+| Tap anywhere on the mini player that is not a transport control | Full player opens |
+| Progress bar | Looks thicker/styled and updates while audio plays |
+| Full player actions | No like button is present |
+| Tap **Add to Cart** in full player | Button changes state and full player cart badge updates immediately |
+| Tap **Cart** in full player | Cart modal opens |
+| Full player volume slider | Volume control works there instead of the mini player |
+| Swipe down or tap close | Full player closes |
 
 ---
 
-## 6 · Mobile checks (narrow viewport)
+## 6 · Cart + checkout messaging
 
-Resize browser to **375 × 667** (iPhone SE) and **390 × 844** (iPhone 14 standard).
+| Step | Expected result |
+|------|----------------|
+| Open cart from header or full player | All cart items and prices are listed clearly |
+| Remove an item | Item disappears and total updates instantly |
+| Empty the cart | Empty-state messaging appears with license note |
+| Open checkout preview from cart | No sign-in prompt appears |
+| Checkout preview | Shows standard-license terms, pricing, and exclusive-beat contact note |
+| Payment button | Shows payment is coming soon instead of opening live processing |
+
+---
+
+## 7 · Responsive checks
+
+Test these viewport sizes:
+
+- **375 × 667 px** (iPhone)
+- **390 × 844 px** (modern phone)
+- **360 × 780 px** (Android)
+- **375 × 500 px** (very short screen)
+- **768 × 1024 px** and **1024 × 768 px** (iPad portrait/landscape)
+- **1280 × 800 px** and wider desktop
 
 | Check | Expected result |
 |-------|----------------|
-| Mini player visible and usable | Controls not clipped or overlapping |
-| Beat cards list scrolls | No horizontal overflow |
-| Beat Tapes / Samples tabs scroll horizontally | Horizontal scroll works, no visual jank |
-| Full player fits on screen | Artwork, controls, and actions all visible without scrolling |
-| Tap targets feel comfortable | Buttons easy to tap without accidentally hitting neighbors |
-
-Resize to **375 × 500** (very short screen).
-
-| Check | Expected result |
-|-------|----------------|
-| Full player opens | Artwork shrinks; controls still usable |
-| No content is cut off or inaccessible | Can scroll to see all controls |
-
----
-
-## 7 · Keyboard accessibility
-
-| Key | Expected result |
-|-----|----------------|
-| **Tab** through the page | Focus ring (red outline) moves through all interactive elements in logical order |
-| **Space** on a beat card or play button | Triggers play/pause |
-| **Arrow Right / Arrow Down** | Advances to next beat |
-| **Arrow Left / Arrow Up** | Goes back to previous beat |
-| **b** key | Opens buy modal for current beat |
-| **l** key | Toggles like on current beat |
-| **c** key | Opens cart modal |
-| **Tab** into progress slider → **Arrow keys** | Seeks audio in small increments |
+| Tabs, search, and cards | No horizontal overflow |
+| Beat cards | Tap targets remain comfortable on small screens |
+| Mini player | Opens full player easily and controls are not clipped |
+| Full player | Artwork, controls, volume slider, and actions remain visible |
+| Desktop | Grid looks clean and professional with the same simplified actions |
 
 ---
 
 ## 8 · Console diagnostics to verify
 
-After a full run, the DevTools Console should contain:
+After a successful pass, you should see normal lifecycle logs such as:
 
-```
+```text
 [MDB] app:dom-ready
-[MDB] fetch:start  (or cache:hit if cached)
-[MDB] fetch:success { records: N }  (or cache:hit { beats: N, ageSecs: N })
-[MDB] cache:saved { beats: N }
+[MDB] fetch:start
+[MDB] fetch:success
+[MDB] cache:saved
 [MDB] app:init-called
-[MDB] audio:load { beat: "..." }
-[MDB] audio:playing { beat: "..." }  (or audio:autoplay-blocked if browser blocks it)
-[MDB] data:loaded { beats: N, playlists: N, singles: N, featured: N }
+[MDB] audio:load
+[MDB] audio:playing
+[MDB] data:loaded
 ```
 
-**No `[MDB] ❌` errors should appear** under normal conditions.
-
----
-
-## Notes
-
-- If any ❌ error appears referencing a missing element (e.g. `Required DOM element #fullPlayerPlay not found`), that element ID changed or was deleted from the HTML.
-- Volume slider position should persist between page reloads (stored in `localStorage` under key `marcdbeats_volume`).
-- Cache TTL is 10 minutes. After 10 minutes the cache auto-expires and fresh data is fetched.
+No `[MDB] ❌` errors should appear during a normal run.

@@ -85,20 +85,17 @@
   const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
 
   // =============================================================
-  // 📦 SUPABASE CONFIG
+  // 📦 OPTIONAL EXTERNAL SERVICES
   // =============================================================
   const SUPABASE_URL = 'https://adilswotkpnjcrdvotne.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
-
-  // THIS IS THE ONLY supabase VARIABLE IN THE ENTIRE FILE
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log('Supabase initialized');
-
-// =============================================================
-// 📦 STRIPE CONFIG
-// =============================================================
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_9tzMrYX8TutSUzuk5VI7XMLD'; // Replace with your key
-const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  // Browser-safe anonymous key; keep Row Level Security enabled for all writable tables.
+  const SUPABASE_ANON_KEY = 'sb_publishable_r0x4QU71BB_RPuVZKur0DQ_EcfYgKEM';
+  const supabase = window.supabase?.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+  // Browser-safe publishable Stripe key; the secret key must remain server-side only.
+  const STRIPE_PUBLISHABLE_KEY = 'pk_live_9tzMrYX8TutSUzuk5VI7XMLD';
+  const stripe = window.Stripe ? Stripe(STRIPE_PUBLISHABLE_KEY) : null;
   
   // =============================================================
   // 📦 STATE
@@ -120,7 +117,10 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     loaded: false,
     playerQueue: [],
     currentPlaylist: 'featured',
-    dataLoaded: false
+    dataLoaded: false,
+    searchQuery: '',
+    expandedSeries: {},
+    seriesVisibleCounts: {}
   };
 
   // =============================================================
@@ -368,8 +368,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       updateUI();
     } catch (error) {
       showToast(error.message, 'fa-exclamation-circle');
-      // Revert optimistic UI update on failure
-      syncAllLikeButtons();
+      updateUI();
     }
   }
 
@@ -384,27 +383,103 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     el.addEventListener('animationend', () => el.classList.remove('cart-add-animation'), { once: true });
   }
 
+  function setSliderProgress(slider, value) {
+    if (!slider) return;
+    const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
+    slider.value = safeValue;
+    slider.style.setProperty('--range-progress', `${safeValue}%`);
+  }
+
+  function isBeatInCart(beatId) {
+    return state.cart.some(item => item.id === beatId);
+  }
+
+  function getBeatStoreBeats() {
+    return state.beats
+      .filter(b => b.featured === true)
+      .sort((a, b) => (a.Order || 999) - (b.Order || 999));
+  }
+
+  function beatMatchesSearch(beat, query = state.searchQuery) {
+    if (!query || !query.trim()) return true;
+    const q = query.toLowerCase().trim();
+    return [
+      beat.title,
+      beat.artist,
+      beat.genre,
+      beat.searchKeywords,
+      beat.mood,
+      beat.tags
+    ]
+      .filter(Boolean)
+      .some(value => value.toString().toLowerCase().includes(q));
+  }
+
+  function renderEmptyState(target, icon, title, message) {
+    if (!target) return;
+    target.innerHTML = `
+      <div class="empty-state">
+        <i class="fas ${icon}" aria-hidden="true"></i>
+        <h3>${title}</h3>
+        <p>${message}</p>
+      </div>
+    `;
+  }
+
+  function updateSearchClearButton() {
+    const button = document.getElementById('beatSearchBtn');
+    if (!button) return;
+    const active = !!state.searchQuery;
+    button.disabled = !active;
+    button.classList.toggle('is-active', active);
+  }
+
+  function updateCartButtons() {
+    document.querySelectorAll('.cart-action[data-beat-id]').forEach(button => {
+      const beatId = parseInt(button.dataset.beatId, 10);
+      const inCart = isBeatInCart(beatId);
+      button.classList.toggle('in-cart', inCart);
+      button.setAttribute('aria-pressed', inCart ? 'true' : 'false');
+      button.disabled = inCart;
+      const label = button.dataset.cartLabel || 'Add to Cart';
+      button.innerHTML = inCart
+        ? '<i class="fas fa-check" aria-hidden="true"></i><span>Added</span>'
+        : `<i class="fas fa-cart-plus" aria-hidden="true"></i><span>${label}</span>`;
+    });
+
+    const fullPlayerAddToCart = document.getElementById('fullPlayerAddToCart');
+    if (fullPlayerAddToCart) {
+      const inCart = state.currentBeat ? isBeatInCart(state.currentBeat.id) : false;
+      fullPlayerAddToCart.classList.toggle('in-cart', inCart);
+      fullPlayerAddToCart.disabled = !state.currentBeat || inCart;
+      fullPlayerAddToCart.innerHTML = inCart
+        ? '<i class="fas fa-check" aria-hidden="true"></i><span>Added to Cart</span>'
+        : '<i class="fas fa-cart-plus" aria-hidden="true"></i><span>Add to Cart</span>';
+    }
+  }
+
+  function pulseCartBadges() {
+    ['cartBadge', 'sidebarCartBadge', 'fullPlayerCartBadge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && state.cart.length > 0) triggerCartAnimation(el);
+    });
+  }
+
   // Returns all cart buttons on the page for a specific beat
   function getCartButtonsForBeat(beatId) {
     const safeId = parseInt(beatId, 10);
     if (isNaN(safeId)) return [];
-    const selector = CART_BUTTON_SELECTOR.replace(/\[data-beat-id\]/g, `[data-beat-id="${safeId}"]`);
-    return document.querySelectorAll(selector);
+    return document.querySelectorAll(`.cart-action[data-beat-id="${safeId}"]`);
   }
 
   function addToCart(beatId) {
     const beat = getBeat(beatId);
     if (!beat) return;
-    if (state.cart.find(b => b.id === beatId)) {
-      showToast('Already in cart', 'fa-exclamation-circle');
-      return;
-    }
+    if (isBeatInCart(beatId)) return;
     state.cart.push(beat);
     updateCartBadge();
-    showToast(`Added "${beat.title}" to cart`, 'fa-shopping-cart');
-    // Animate all cart buttons for this beat and the player cart icon
     getCartButtonsForBeat(beatId).forEach(triggerCartAnimation);
-    triggerCartAnimation(document.getElementById('playerAddToCart'));
+    pulseCartBadges();
   }
 
   function removeFromCart(beatId) {
@@ -414,17 +489,13 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
   }
 
   function updateCartBadge() {
-    const badge = document.getElementById('cartBadge');
-    if (badge) {
+    ['cartBadge', 'sidebarCartBadge', 'fullPlayerCartBadge'].forEach(id => {
+      const badge = document.getElementById(id);
+      if (!badge) return;
       badge.textContent = state.cart.length;
-      badge.style.display = state.cart.length > 0 ? 'flex' : 'none';
-    }
-    // Sync desktop sidebar cart badge
-    const sidebarBadge = document.getElementById('sidebarCartBadge');
-    if (sidebarBadge) {
-      sidebarBadge.textContent = state.cart.length;
-      sidebarBadge.style.display = state.cart.length > 0 ? 'inline-flex' : 'none';
-    }
+      badge.style.display = state.cart.length > 0 ? 'inline-flex' : 'none';
+    });
+    updateCartButtons();
   }
 
   // =============================================================
@@ -437,7 +508,6 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
-    renderSync();
     updateUI();
     return;
   }
@@ -480,7 +550,7 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
           });
           state.loaded = true;
           state.dataLoaded = true;
-          renderBeatStore(); renderBeatTapes(); renderSamples(); renderSync(); updateUI();
+          renderBeatStore(); renderBeatTapes(); renderSamples(); updateUI();
           hideLoadingSpinner();
           return;
         } else {
@@ -538,7 +608,6 @@ const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
       renderBeatStore();
       renderBeatTapes();
       renderSamples();
-      renderSync();
       updateUI();
       showToast('No beats found in Airtable', 'fa-exclamation-circle');
       return;
@@ -602,7 +671,6 @@ state.playlists = playlistIds.map(id => {
     renderBeatStore();
     renderBeatTapes();
     renderSamples();
-    renderSync();
     updateUI();
     hideLoadingSpinner();
 
@@ -620,27 +688,9 @@ state.playlists = playlistIds.map(id => {
   // 🔍 SEARCH
   // =============================================================
   function searchBeats(query) {
-    if (!query || query.trim().length < 2) {
-      renderDiscover(0);
-      return;
-    }
-    const q = query.toLowerCase().trim();
-    const results = state.beats.filter(beat =>
-      beat.title.toLowerCase().includes(q) ||
-      beat.artist.toLowerCase().includes(q) ||
-      beat.genre.toLowerCase().includes(q) ||
-      beat.searchKeywords.toLowerCase().includes(q)
-    );
-    if (results.length === 0) {
-      showToast('No beats found', 'fa-search');
-      return;
-    }
-    const container = document.getElementById('exploreBeatDisplay');
-    if (!container) return;
-    container.querySelectorAll('.swipe-card').forEach(c => c.remove());
-    const beat = results[0];
-    state.currentBeat = beat;
-    renderCard(beat, 0, results);
+    state.searchQuery = (query || '').trim();
+    updateSearchClearButton();
+    renderBeatStore();
   }
 
   // =============================================================
@@ -704,19 +754,6 @@ function renderCard(beat, index, queue) {
     }
   }
   
-  // UPDATE LIKE BUTTONS
-  const liked = isLiked(beat.id);
-  
-  const playerLike = document.getElementById('playerLike');
-  if (playerLike) {
-    playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-  }
-  
-  const fullLike = document.getElementById('fullPlayerLike');
-  if (fullLike) {
-    fullLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-  }
-  
   // LOAD AND PLAY AUDIO
   const audio = document.getElementById('audioPlayer');
   if (audio) {
@@ -738,17 +775,20 @@ function renderCard(beat, index, queue) {
           state.isPlaying = true;
           document.getElementById('playerPlay').innerHTML = '<i class="fas fa-pause"></i>';
           document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-pause"></i>';
+          updateCartButtons();
         })
         .catch(err => {
           logger.warn('audio:autoplay-blocked', { beat: beat.title, reason: err.message });
           state.isPlaying = false;
           document.getElementById('playerPlay').innerHTML = '<i class="fas fa-play"></i>';
           document.getElementById('fullPlayerPlay').innerHTML = '<i class="fas fa-play"></i>';
+          updateCartButtons();
         });
     }
   } else {
     logger.warn('audio:no-mp3', { beat: beat.title });
   }
+  updateCartButtons();
 }
 
   // =============================================================
@@ -964,6 +1004,10 @@ function renderCard(beat, index, queue) {
       modalBox.innerHTML = `
         <h2>Your Cart</h2>
         <p class="sub">Your cart is empty</p>
+        <div class="cart-license-note">
+          <strong>Standard License:</strong> $${BEAT_PRICE.toFixed(2)} per beat
+          <span>Contact MarcDBeats for exclusive beats.</span>
+        </div>
         <button class="btn-secondary" id="closeCart">Continue Browsing</button>
       `;
       document.getElementById('closeCart')?.addEventListener('click', () => {
@@ -976,7 +1020,12 @@ function renderCard(beat, index, queue) {
     let total = 0;
     modalBox.innerHTML = `
       <h2>Your Cart (${state.cart.length})</h2>
-      <p class="sub">Each license is $${BEAT_PRICE.toFixed(2)}</p>
+      <p class="sub">All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each</p>
+      <div class="cart-license-note">
+        <strong>Terms & Conditions required before payment opens.</strong>
+        <span>Checkout is open to everyone. Payment processing stays disabled until the UI is finalized.</span>
+        <span>Need something custom? Contact MarcDBeats for exclusive beats.</span>
+      </div>
       ${state.cart.map(beat => `
   <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -1038,26 +1087,37 @@ function renderCard(beat, index, queue) {
   }
 
   function showCartCheckout() {
-  // Check if cart is empty
-  if (state.cart.length === 0) {
-    showToast('Your cart is empty', 'fa-exclamation-circle');
-    return;
-  }
+    if (state.cart.length === 0) {
+      showToast('Your cart is empty', 'fa-exclamation-circle');
+      return;
+    }
 
-  // Check if user is logged in
-  if (!isLoggedIn()) {
-    showToast('Please sign in to checkout', 'fa-sign-in-alt');
-    showAuthModal();
-    return;
-  }
+    const modalBox = document.getElementById('modalBox');
+    if (!modalBox) return;
 
-  // Close cart modal
-  document.getElementById('modalOverlay').classList.remove('active');
-  
-  // Show checkout for the first beat
-  const firstBeat = state.cart[0];
-  handleBuy(firstBeat.id);
-}
+    const total = state.cart.length * BEAT_PRICE;
+    modalBox.innerHTML = `
+      <h2>Checkout Preview</h2>
+      <p class="sub">Everything is ready for guest checkout once payments are enabled.</p>
+      <div class="cart-license-note">
+        <strong>Terms & Conditions</strong>
+        <span>All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each.</span>
+        <span>Contact MarcDBeats for exclusive beats.</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border-subtle);">
+        <span>${state.cart.length} item${state.cart.length === 1 ? '' : 's'}</span>
+        <strong>${formatPrice(total)}</strong>
+      </div>
+      <button class="btn-primary" id="checkoutPreviewBtn" style="margin-top:16px;">Payment Coming Soon</button>
+      <button class="btn-secondary" id="closeCheckoutPreview">Back to Cart</button>
+    `;
+
+    document.getElementById('checkoutPreviewBtn')?.addEventListener('click', () => {
+      showToast('Payment processing will be enabled after the UI review.', 'fa-info-circle');
+    });
+    document.getElementById('closeCheckoutPreview')?.addEventListener('click', renderCartModal);
+    document.getElementById('modalOverlay')?.classList.add('active');
+  }
 
   // =============================================================
   // 🔐 AUTH MODAL
@@ -1186,6 +1246,7 @@ function renderCard(beat, index, queue) {
     if (!playlist) return;
 
     const beats = playlist.beats;
+    state.currentPlaylist = playlistId;
     document.getElementById('detailTitle').textContent = playlist.name;
     document.getElementById('detailCount').textContent = `${beats.length} beats`;
 
@@ -1200,62 +1261,36 @@ function renderCard(beat, index, queue) {
           <div class="artist">${beat.artist} · ${beat.genre}</div>
         </div>
         <div class="track-actions">
-          <button class="like-btn-track ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
-            <i class="fas fa-heart"></i>
-          </button>
-          <button class="cart-btn-track" data-beat-id="${beat.id}">
-            <i class="fas fa-shopping-cart"></i>
-          </button>
-          <button class="buy-btn-track" data-beat-id="${beat.id}" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);padding:2px 12px;border-radius:12px;font-size:11px;font-weight:600;border:none;cursor:pointer;">
-            PWYW
+          <button class="cart-action cart-btn-track" data-cart-label="Add" data-beat-id="${beat.id}" aria-label="Add ${beat.title} to cart">
+            <i class="fas fa-cart-plus" aria-hidden="true"></i>
+            <span>Add</span>
           </button>
         </div>
       </div>
     `).join('');
 
     tracklist.querySelectorAll('.track-item').forEach(item => {
-  item.addEventListener('click', (e) => {
-    if (e.target.closest('button')) return;
-    const beatId = parseInt(item.dataset.beatId);
-    const beat = getBeat(beatId);
-    if (beat) {
-      closeAllViews();
-      switchTab('discover');
-      renderDiscover(state.beats.indexOf(beat));
-    }
-  });
-});
-
-    tracklist.querySelectorAll('.like-btn-track').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!isLoggedIn()) {
-          showToast('Please sign in to like beats', 'fa-sign-in-alt');
-          return;
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const beatId = parseInt(item.dataset.beatId, 10);
+        const beat = playlist.beats.find(track => track.id === beatId);
+        if (beat) {
+          renderCard(beat, beats.indexOf(beat), beats);
+          updateNowPlayingUI(beat.id);
         }
-        const beatId = parseInt(btn.dataset.beatId);
-        btn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
-        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
       });
     });
 
-    tracklist.querySelectorAll('.cart-btn-track').forEach(btn => {
+    tracklist.querySelectorAll('.cart-action').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const beatId = parseInt(btn.dataset.beatId);
+        const beatId = parseInt(btn.dataset.beatId, 10);
         addToCart(beatId);
       });
     });
 
-    tracklist.querySelectorAll('.buy-btn-track').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const beatId = parseInt(btn.dataset.beatId);
-        handleBuy(beatId);
-      });
-    });
-
     document.getElementById('playlistDetail').classList.add('active');
+    updateCartButtons();
   }
 
   function showSeriesDetail(seriesName) {
@@ -1482,7 +1517,6 @@ function renderCard(beat, index, queue) {
   if (tab === 'beatstore') renderBeatStore();
   if (tab === 'beattapes') renderBeatTapes();
   if (tab === 'samples') renderSamples();
-  if (tab === 'sync') renderSync();
 }
 
   // Filter buttons are registered inside DOMContentLoaded below to ensure DOM exists.
@@ -1575,53 +1609,8 @@ if (featuredSorted.length > 0) {
   // 🔄 UI UPDATE
   // =============================================================
   function updateUI() {
-  const likesCount = state.likes.length;
-  const badge = document.getElementById('likesBadge');
-  if (badge) {
-    badge.style.display = likesCount > 0 ? 'block' : 'none';
-  }
-
-  const authBtn = document.getElementById('authNavBtn');
-  if (authBtn) {
-    if (isLoggedIn()) {
-      // Show user icon when logged in
-      authBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
-      authBtn.style.background = 'none';
-      authBtn.style.color = 'var(--text-secondary)';
-      authBtn.title = state.user.email;
-    } else {
-      // Show user icon when logged out
-      authBtn.innerHTML = `<i class="fas fa-user-circle"></i>`;
-      authBtn.style.background = 'none';
-      authBtn.style.color = 'var(--text-secondary)';
-      authBtn.title = 'Sign In';
-    }
-  }
-
-  updateCartBadge();
-  syncAllLikeButtons();
-}
-
-  // Sync every like button on the page to the current state.likes list
-  function syncAllLikeButtons() {
-    document.querySelectorAll(LIKE_BUTTON_SELECTOR).forEach(el => {
-      el.classList.toggle('liked', isLiked(parseInt(el.dataset.beatId)));
-    });
-    // Sync bottom bar and full-player like buttons (these have inline styles, so manage color directly)
-    if (state.currentBeat) {
-      const playerLike = document.getElementById('playerLike');
-      if (playerLike) {
-        const liked = isLiked(state.currentBeat.id);
-        playerLike.classList.toggle('liked', liked);
-        playerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-      }
-      const fullPlayerLike = document.getElementById('fullPlayerLike');
-      if (fullPlayerLike) {
-        const liked = isLiked(state.currentBeat.id);
-        fullPlayerLike.classList.toggle('liked', liked);
-        fullPlayerLike.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-      }
-    }
+    updateCartBadge();
+    updateCartButtons();
   }
 // =============================================================
 // 📱 FULL PLAYER
@@ -1661,13 +1650,7 @@ function syncFullPlayer() {
   // Update title
   document.getElementById('fullPlayerTitle').textContent = beat.title;
   document.getElementById('fullPlayerArtist').textContent = beat.artist;
-  
-  // Update like button state
-  const likeBtn = document.getElementById('fullPlayerLike');
-  if (likeBtn) {
-    likeBtn.classList.toggle('liked', isLiked(beat.id));
-    likeBtn.style.color = isLiked(beat.id) ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-  }
+  updateCartButtons();
   
   // Sync progress
   const audio = document.getElementById('audioPlayer');
@@ -1678,7 +1661,7 @@ function syncFullPlayer() {
     
     if (!isNaN(audio.duration) && audio.duration > 0) {
       const progress = (audio.currentTime / audio.duration) * 100;
-      if (progressSlider) progressSlider.value = progress;
+      if (progressSlider) setSliderProgress(progressSlider, progress);
       if (timeCurrent) timeCurrent.textContent = formatTime(audio.currentTime);
       if (timeTotal) timeTotal.textContent = formatTime(audio.duration);
     }
@@ -1859,113 +1842,143 @@ function renderSamples() {
   attachBeatCardEvents();
 }
 
-function renderSync() {
-  const grid = document.getElementById('syncGrid');
+function renderBeatStore() {
+  const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
-  
-  const syncBeats = state.beats.filter(b => b.featured === true);
-  if (syncBeats.length === 0) {
-    grid.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">No sync beats yet</div>`;
+  updateSearchClearButton();
+
+  const beats = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
+  if (beats.length === 0) {
+    renderEmptyState(
+      grid,
+      'fa-search',
+      state.searchQuery ? 'No matching beats' : 'No beats yet',
+      state.searchQuery ? 'Try another search term.' : 'Featured beats will appear here.'
+    );
     return;
   }
-  
-  grid.innerHTML = syncBeats.map(beat => `
+
+  grid.innerHTML = beats.map(beat => `
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
         <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
-        <div class="beat-card-play-overlay" aria-hidden="true"><i class="fas fa-play"></i></div>
-        <span class="featured-badge">🎬</span>
+        <div class="beat-card-play-overlay" aria-hidden="true"><span>Tap to preview</span></div>
       </div>
       <div class="beat-card-info">
         <div class="beat-card-title">${beat.title}</div>
         <div class="beat-card-artist">${beat.artist}</div>
+        <div class="beat-card-meta">${beat.genre || 'Beat'} · ${formatPrice(BEAT_PRICE)}</div>
       </div>
       <div class="beat-card-actions">
-        <button class="play-sm" data-beat-id="${beat.id}"><i class="fas fa-play"></i></button>
-        <button class="cart-sm" data-beat-id="${beat.id}"><i class="fas fa-shopping-cart"></i></button>
-        <button class="like-sm ${isLiked(beat.id) ? 'liked' : ''}" data-beat-id="${beat.id}">
-          <i class="fas fa-heart"></i>
+        <button class="cart-action cart-sm" data-cart-label="Add to Cart" data-beat-id="${beat.id}" aria-label="Add ${beat.title} to cart">
+          <i class="fas fa-cart-plus" aria-hidden="true"></i>
+          <span>Add to Cart</span>
         </button>
       </div>
     </div>
   `).join('');
-  
+
   attachBeatCardEvents();
+  state.currentPlaylist = 'featured';
 }
+
+function renderBeatTapes() {
+  const grid = document.getElementById('beatTapesGrid');
+  if (!grid) return;
+
+  if (state.playlists.length === 0) {
+    renderEmptyState(grid, 'fa-compact-disc', 'No beat tapes yet', 'Beat tape series will appear here.');
+    return;
+  }
+
+  const seriesMap = getPlaylistSeries();
+  const seriesNames = Object.keys(seriesMap);
+
+  grid.innerHTML = seriesNames.map(seriesName => {
+    const seriesPlaylists = seriesMap[seriesName];
+    const totalBeats = seriesPlaylists.reduce((sum, playlist) => sum + playlist.beats.length, 0);
+    const isExpanded = !!state.expandedSeries[seriesName];
+    const visibleCount = state.seriesVisibleCounts[seriesName] || 12;
+    const visiblePlaylists = isExpanded ? seriesPlaylists.slice(0, visibleCount) : [];
+
+    return `
+      <section class="series-accordion ${isExpanded ? 'expanded' : ''}" data-series="${seriesName}">
+        <button class="series-toggle" data-series="${seriesName}" aria-expanded="${isExpanded ? 'true' : 'false'}">
+          <div>
+            <div class="series-title">${seriesName}</div>
+            <div class="series-summary">${seriesPlaylists.length} tape${seriesPlaylists.length === 1 ? '' : 's'} · ${totalBeats} beats</div>
+          </div>
+          <span class="series-toggle-icon"><i class="fas fa-chevron-${isExpanded ? 'up' : 'down'}" aria-hidden="true"></i></span>
+        </button>
+        <div class="series-panel">
+          <div class="series-playlist-list">
+            ${visiblePlaylists.map(playlist => `
+              <button class="series-playlist-item" data-playlist-id="${playlist.id}" aria-label="Open ${playlist.name}">
+                <span class="series-playlist-number">${playlist.seriesNumber ? `#${playlist.seriesNumber}` : 'Tape'}</span>
+                <span class="series-playlist-copy">
+                  <strong>${playlist.name}</strong>
+                  <small>${playlist.beats.length} beats</small>
+                </span>
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              </button>
+            `).join('')}
+          </div>
+          ${isExpanded && visibleCount < seriesPlaylists.length ? `<button class="series-load-more" data-series="${seriesName}">Load more</button>` : ''}
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.series-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const seriesName = btn.dataset.series;
+      state.expandedSeries[seriesName] = !state.expandedSeries[seriesName];
+      state.seriesVisibleCounts[seriesName] = state.seriesVisibleCounts[seriesName] || 12;
+      renderBeatTapes();
+    });
+  });
+
+  grid.querySelectorAll('.series-load-more').forEach(btn => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const seriesName = btn.dataset.series;
+      state.seriesVisibleCounts[seriesName] = (state.seriesVisibleCounts[seriesName] || 12) + 12;
+      renderBeatTapes();
+    });
+  });
+
+  grid.querySelectorAll('.series-playlist-item').forEach(button => {
+    button.addEventListener('click', () => showPlaylistDetail(button.dataset.playlistId));
+  });
+}
+
+function renderSamples() {
+  const grid = document.getElementById('samplesGrid');
+  if (!grid) return;
+  renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
+}
+
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
-  console.log('🎯 Attaching beat card events...');
-  
-  // Remove any old listeners to prevent duplicates
+  const beatStoreQueue = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
   document.querySelectorAll('.beat-card').forEach(card => {
-    card.replaceWith(card.cloneNode(true));
-  });
-  
-  // Re-query after clone
-  document.querySelectorAll('.beat-card').forEach(card => {
-    const beatId = parseInt(card.dataset.beatId);
-    
-    // CARD CLICK - click anywhere on the card
-    card.addEventListener('click', function(e) {
-      // Ignore clicks on buttons
-      if (e.target.closest('button')) return;
-      
+    const freshCard = card.cloneNode(true);
+    card.replaceWith(freshCard);
+
+    const beatId = parseInt(freshCard.dataset.beatId, 10);
+    freshCard.addEventListener('click', event => {
+      if (event.target.closest('button')) return;
       const beat = getBeat(beatId);
-      if (beat) {
-        const index = state.beats.indexOf(beat);
-        console.log('🎵 Card clicked - playing:', beat.title);
-        renderCard(beat, index, state.beats);
-      }
+      if (beat) renderCard(beat, beatStoreQueue.indexOf(beat), beatStoreQueue);
     });
-    
-    // PLAY BUTTON
-    const playBtn = card.querySelector('.play-sm');
-    if (playBtn) {
-      playBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const beat = getBeat(beatId);
-        if (beat) {
-          const index = state.beats.indexOf(beat);
-          console.log('▶️ Play button clicked - playing:', beat.title);
-          renderCard(beat, index, state.beats);
-        }
-      });
-    }
-    
-    // BUY BUTTON
-    const buyBtn = card.querySelector('.buy-sm');
-    if (buyBtn) {
-      buyBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        handleBuy(beatId);
-      });
-    }
-    
-    // LIKE BUTTON
-    const likeBtn = card.querySelector('.like-sm');
-    if (likeBtn) {
-      likeBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (!isLoggedIn()) {
-          showToast('Please sign in to like beats', 'fa-sign-in-alt');
-          return;
-        }
-        likeBtn.classList.toggle('liked', getToggledLikeState(beatId)); // optimistic: show the post-toggle state
-        toggleLike(beatId); // confirms via DB then calls syncAllLikeButtons()
-      });
-    }
-    
-    // CART BUTTON (for sync tab)
-    const cartBtn = card.querySelector('.cart-sm');
-    if (cartBtn) {
-      cartBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        addToCart(beatId);
-      });
-    }
+
+    freshCard.querySelector('.cart-action')?.addEventListener('click', event => {
+      event.stopPropagation();
+      addToCart(beatId);
+    });
   });
-  
-  console.log('✅ Beat card events attached!');
+
+  updateCartButtons();
 }
 
 // =============================================================
@@ -1978,21 +1991,6 @@ function handleBuy(beatId) {
     showToast('Beat not found', 'fa-exclamation-circle');
     return;
   }
-
-  if (!isLoggedIn()) {
-    showToast('Please sign in to purchase', 'fa-sign-in-alt');
-    showAuthModal();
-    return;
-  }
-
-  // Check if user already purchased this beat
-  const alreadyPurchased = state.purchases.some(p => p.beat_id === beatId);
-  if (alreadyPurchased) {
-    showToast('You already own this beat!', 'fa-check-circle');
-    return;
-  }
-
-  // Show checkout modal with fixed price
   showCheckoutModal(beat);
 }
 
@@ -2001,21 +1999,22 @@ function showCheckoutModal(beat) {
   if (!modalBox) return;
 
   modalBox.innerHTML = `
-    <h2>Purchase License</h2>
-    <p class="sub">You're about to purchase a license for "${beat.title}"</p>
+    <h2>License Preview</h2>
+    <p class="sub">You're reviewing the Standard License for "${beat.title}"</p>
     
     <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
       <div style="font-size:48px;font-weight:800;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:16px 0;font-size:13px;color:var(--text-secondary);">
-      <input type="checkbox" id="termsCheckbox" style="width:18px;height:18px;accent-color:var(--accent);" />
-      <label for="termsCheckbox">I agree to the <a href="#" style="color:var(--accent);text-decoration:underline;">Terms & Conditions</a></label>
+    <div class="cart-license-note" style="margin-bottom:16px;">
+      <strong>Terms & Conditions</strong>
+      <span>All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each.</span>
+      <span>Contact MarcDBeats for exclusive beats.</span>
     </div>
 
     <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Pay $${BEAT_PRICE.toFixed(2)}
+      <i class="fas fa-lock"></i> Payment Coming Soon
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
@@ -2027,15 +2026,9 @@ function showCheckoutModal(beat) {
   });
 
   document.getElementById('checkoutBtn').addEventListener('click', async () => {
-    const termsCheckbox = document.getElementById('termsCheckbox');
-    if (!termsCheckbox.checked) {
-      showToast('Please agree to the Terms & Conditions', 'fa-exclamation-circle');
-      return;
-    }
-
-    showToast('Payment coming soon! 🚀', 'fa-rocket');
+    showToast('Payment processing will be enabled after the UI review.', 'fa-info-circle');
     document.getElementById('modalOverlay').classList.remove('active');
-});
+  });
 
   document.getElementById('modalOverlay').classList.add('active');
 }
@@ -2070,7 +2063,6 @@ function showCheckoutModal(beat) {
           if (tab === 'beatstore') renderBeatStore();
           if (tab === 'beattapes') renderBeatTapes();
           if (tab === 'samples') renderSamples();
-          if (tab === 'sync') renderSync();
         }
       });
     });
@@ -2105,42 +2097,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     document.getElementById('termsBack')?.addEventListener('click', closeAllViews);
     document.getElementById('detailBack')?.addEventListener('click', closeAllViews);
 
-    document.getElementById('authNavBtn')?.addEventListener('click', () => {
-      if (isLoggedIn()) {
-        showPortal();
-      } else {
-        showAuthModal();
-      }
-    });
-
-    document.getElementById('likesNavBtn')?.addEventListener('click', () => {
-      if (!isLoggedIn()) {
-        showToast('Please sign in to view your likes', 'fa-sign-in-alt');
-        showAuthModal();
-        return;
-      }
-      showPortal();
-    });
-
     document.getElementById('cartNavBtn')?.addEventListener('click', renderCartModal);
-
-    document.getElementById('dislikeBtn')?.addEventListener('click', nextBeat);
-    document.getElementById('likeBtn')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        toggleLike(state.currentBeat.id);
-      }
-    });
-    document.getElementById('cartBtn')?.addEventListener('click', () => {
-      if (state.currentBeat) {
-        addToCart(state.currentBeat.id);
-      }
-    });
-    document.getElementById('buyBtn')?.addEventListener('click', () => {
-  if (state.currentBeat) {
-    handleBuy(state.currentBeat.id);
-  }
-});
-    document.getElementById('nextBtn')?.addEventListener('click', nextBeat);
 
     requireEl('playerPlay')?.addEventListener('click', () => {
       const audio = requireEl('audioPlayer');
@@ -2170,29 +2127,8 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
       }
     });
 
-    document.getElementById('playerPrev')?.addEventListener('click', function() {
-      const prevIndex = state.currentIndex - 1;
-      if (prevIndex < 0) {
-        showToast('First beat', 'fa-info-circle');
-        return;
-      }
-      const beat = state.beats[prevIndex];
-      if (beat) {
-        renderCard(beat, prevIndex, state.beats);
-      }
-    });
-
-    document.getElementById('playerNext')?.addEventListener('click', function() {
-      const nextIndex = state.currentIndex + 1;
-      if (nextIndex >= state.beats.length) {
-        showToast('All beats viewed', 'fa-check-circle');
-        return;
-      }
-      const beat = state.beats[nextIndex];
-      if (beat) {
-        renderCard(beat, nextIndex, state.beats);
-      }
-    });
+    document.getElementById('playerPrev')?.addEventListener('click', prevBeat);
+    document.getElementById('playerNext')?.addEventListener('click', nextBeat);
 
     requireEl('audioPlayer')?.addEventListener('ended', () => {
       logger.info('audio:ended', { beat: state.currentBeat?.title });
@@ -2203,35 +2139,16 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
       nextBeat();
     });
 
-    document.getElementById('playerLike')?.addEventListener('click', function() {
-      if (!isLoggedIn()) {
-        showToast('Please sign in to like beats', 'fa-sign-in-alt');
-        return;
-      }
-      if (state.currentBeat) {
-        toggleLike(state.currentBeat.id);
-      }
+    document.getElementById('beatSearchBtn')?.addEventListener('click', () => {
+      const input = document.getElementById('beatSearchInput');
+      if (!input) return;
+      input.value = '';
+      searchBeats('');
+      input.focus();
     });
-
-    document.getElementById('playerAddToCart')?.addEventListener('click', function() {
-      if (state.currentBeat) {
-        addToCart(state.currentBeat.id);
-      }
+    document.getElementById('beatSearchInput')?.addEventListener('input', (e) => {
+      searchBeats(e.target.value);
     });
-
-    document.getElementById('playerCart')?.addEventListener('click', renderCartModal);
-
-    // Beat Store Search (new)
-document.getElementById('beatSearchBtn')?.addEventListener('click', () => {
-  const query = document.getElementById('beatSearchInput')?.value;
-  if (query) searchBeats(query);
-});
-document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    const query = document.getElementById('beatSearchInput')?.value;
-    if (query) searchBeats(query);
-  }
-});
 
     document.addEventListener('keydown', (e) => {
       if (document.getElementById('modalOverlay')?.classList.contains('active')) return;
@@ -2248,14 +2165,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         e.preventDefault();
         document.getElementById('playerPlay')?.click();
       }
-      if (e.key === 'b' || e.key === 'B') {
-        document.getElementById('buyBtn')?.click();
-      }
-      if (e.key === 'l' || e.key === 'L') {
-        document.getElementById('likeBtn')?.click();
-      }
       if (e.key === 'c' || e.key === 'C') {
-        document.getElementById('cartBtn')?.click();
+        renderCartModal();
       }
       if (e.key === 'f' || e.key === 'F') {
         if (state.currentBeat) openFullPlayer();
@@ -2270,9 +2181,6 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       });
     });
     document.getElementById('sidebarCartBtn')?.addEventListener('click', renderCartModal);
-    document.getElementById('sidebarAuthBtn')?.addEventListener('click', () => {
-      if (isLoggedIn()) showPortal(); else showAuthModal();
-    });
     document.querySelector('.sidebar-brand')?.addEventListener('click', () => {
       closeAllViews();
       switchTab('beatstore');
@@ -2317,23 +2225,6 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     requireEl('fullPlayerPrev')?.addEventListener('click', prevBeat);
     requireEl('fullPlayerNext')?.addEventListener('click', nextBeat);
 
-    document.getElementById('fullPlayerLike')?.addEventListener('click', function() {
-      if (!isLoggedIn()) {
-        showToast('Please sign in to like beats ❤️', 'fa-sign-in-alt');
-        showAuthModal();
-        return;
-      }
-      if (state.currentBeat) {
-        toggleLike(state.currentBeat.id);
-        const likeBtn = document.getElementById('fullPlayerLike');
-        if (likeBtn) {
-          const liked = isLiked(state.currentBeat.id);
-          likeBtn.style.color = liked ? LIKE_COLOR_ACTIVE : 'var(--text-muted)';
-          likeBtn.classList.toggle('liked', liked);
-        }
-      }
-    });
-
     document.getElementById('fullPlayerAddToCart')?.addEventListener('click', function() {
       if (state.currentBeat) addToCart(state.currentBeat.id);
     });
@@ -2345,6 +2236,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       const audio = document.getElementById('audioPlayer');
       if (audio && !isNaN(audio.duration) && audio.duration > 0) {
         audio.currentTime = (parseFloat(this.value) / 100) * audio.duration;
+        setSliderProgress(this, this.value);
       }
     });
 
@@ -2357,11 +2249,11 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       _audioEl.addEventListener('timeupdate', function() {
         if (!isNaN(_audioEl.duration) && _audioEl.duration > 0) {
           const progress = (_audioEl.currentTime / _audioEl.duration) * 100;
-          if (_progSlider) _progSlider.value = progress;
+          if (_progSlider) setSliderProgress(_progSlider, progress);
           const tCur = document.getElementById('timeCurrent');
           if (tCur) tCur.textContent = formatTime(_audioEl.currentTime);
           if (_fullOverlay?.classList.contains('active')) {
-            if (_fullProgSlider) _fullProgSlider.value = progress;
+            if (_fullProgSlider) setSliderProgress(_fullProgSlider, progress);
             const ftCur = document.getElementById('fullTimeCurrent');
             if (ftCur) ftCur.textContent = formatTime(_audioEl.currentTime);
           }
@@ -2381,6 +2273,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     _progSlider?.addEventListener('input', function() {
       if (_audioEl && !isNaN(_audioEl.duration) && _audioEl.duration > 0) {
         _audioEl.currentTime = (parseFloat(this.value) / 100) * _audioEl.duration;
+        setSliderProgress(this, this.value);
       }
     });
 
@@ -2388,8 +2281,8 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
     // Restore saved volume on app start; clamp to [0, 1] to guard against bad data
     const _rawVol = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
     const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
-    const _volSlider = document.getElementById('volumeSlider');
-    const _volRow = document.querySelector('.volume-row');
+    const _volSlider = document.getElementById('fullVolumeSlider');
+    const _volRow = document.querySelector('.full-player-volume');
 
     // Feature-detect whether programmatic volume control is supported.
     // Desktop browsers and Android Chrome/WebView support it fully.
@@ -2425,15 +2318,16 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
           _muteBtn.classList.toggle('muted', _audioEl.muted);
         }
       });
-      // Insert mute button into the dedicated bottom bar actions container
-      // Guard against duplicate insertion using an explicit flag
-      const _actionsRow = document.getElementById('playerActions');
+      const _actionsRow = document.getElementById('fullPlayerActions');
       if (_actionsRow && !_muteBtnInserted) {
         _actionsRow.appendChild(_muteBtn);
         _muteBtnInserted = true;
       }
     } else {
-      if (_volSlider) _volSlider.value = _savedVolume;
+      if (_volSlider) {
+        _volSlider.value = _savedVolume;
+        _volSlider.style.setProperty('--range-progress', `${_savedVolume * 100}%`);
+      }
       if (_audioEl) _audioEl.volume = _savedVolume;
 
       _volSlider?.addEventListener('input', function() {
@@ -2441,6 +2335,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
         if (_audioEl) _audioEl.volume = vol;
         // Persist volume across sessions
         localStorage.setItem('marcdbeats_volume', this.value);
+        this.style.setProperty('--range-progress', `${vol * 100}%`);
         const icon = document.getElementById('volumeIcon');
         if (icon) {
           if (vol === 0) icon.className = 'fas fa-volume-mute';
@@ -2493,7 +2388,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
       --bottom-nav-height: 56px;
       --like-color-active: #22c55e; /* synced with JS LIKE_COLOR_ACTIVE constant */
     }
-    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: none; user-select: none; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; touch-action: manipulation; user-select: auto; }
     .app { max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; background: var(--bg-secondary); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 60px rgba(0, 0, 0, 0.9); overflow: hidden; }
         /* New Header Layout */
 .header {
@@ -2949,7 +2844,7 @@ document.getElementById('beatSearchInput')?.addEventListener('keydown', (e) => {
   box-shadow: 0 6px 24px rgba(220, 38, 38, 0.4) !important;
 }
     .cart-badge {
-  display: none !important;
+  display: none;
 }
 
 /* Global button improvements */
@@ -4027,6 +3922,303 @@ input[type="range"]:focus-visible {
   .toast { bottom: calc(var(--bottom-nav-height) + 96px); }
 }
 
+/* ===== 2026 STORE OVERHAUL OVERRIDES ===== */
+.empty-state {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+}
+.empty-state i { font-size: 28px; color: var(--accent); }
+.empty-state h3 { color: var(--text-primary); font-size: 18px; }
+.empty-state p { max-width: 280px; line-height: 1.5; }
+
+.tab-nav {
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-bottom: none;
+}
+.tab-nav button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid transparent;
+}
+.tab-nav button.active {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: var(--accent-border);
+  color: #fff;
+}
+.beat-search-btn {
+  opacity: 0.45;
+}
+.beat-search-btn.is-active {
+  opacity: 1;
+}
+.beat-search-btn:disabled {
+  cursor: default !important;
+}
+
+.beat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.beat-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-areas:
+    "art info"
+    "art actions";
+  gap: 10px 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+}
+.beat-card-art { grid-area: art; width: 72px; height: 72px; border-radius: 14px; }
+.beat-card-info { grid-area: info; }
+.beat-card-title { font-size: 15px; }
+.beat-card-artist { font-size: 13px; margin-top: 2px; }
+.beat-card-meta { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.beat-card-actions { grid-area: actions; justify-content: flex-start; }
+.beat-card-play-overlay {
+  opacity: 1;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.55));
+}
+.beat-card-play-overlay span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.88);
+}
+.beat-card-play-overlay i { display: none; }
+
+.cart-action,
+.full-player-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.cart-action {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.cart-action.in-cart,
+.full-player-actions button.in-cart {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: var(--accent-border);
+  color: #fff;
+}
+.cart-action:disabled,
+.full-player-actions button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.series-accordion {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+#beatTapesGrid {
+  display: flex !important;
+  flex-direction: column;
+  gap: 14px;
+}
+.series-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+}
+.series-title { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+.series-summary { margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.series-panel { display: none; padding: 0 16px 16px; }
+.series-accordion.expanded .series-panel { display: block; }
+.series-playlist-list { display: flex; flex-direction: column; gap: 10px; }
+.series-playlist-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  text-align: left;
+}
+.series-playlist-number {
+  min-width: 54px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.series-playlist-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.series-playlist-copy strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.series-playlist-copy small { color: var(--text-muted); font-size: 12px; }
+.series-load-more {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--accent-border);
+  background: rgba(220, 38, 38, 0.08);
+  color: #fff;
+  font-weight: 600;
+}
+
+.playlist-detail .detail-tracklist { padding-bottom: 104px; }
+.playlist-detail .track-item {
+  padding: 14px 16px;
+  align-items: flex-start;
+}
+.playlist-detail .track-item .track-number {
+  width: 28px;
+  padding-top: 10px;
+}
+.playlist-detail .track-item .track-actions .cart-btn-track {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+#progressSlider,
+#fullProgressSlider,
+.volume-slider {
+  --range-progress: 0%;
+  background: linear-gradient(90deg, var(--accent) 0%, #f87171 var(--range-progress), rgba(255,255,255,0.14) var(--range-progress), rgba(255,255,255,0.14) 100%) !important;
+}
+#progressSlider,
+#fullProgressSlider {
+  height: 8px !important;
+  border-radius: 999px !important;
+}
+#progressSlider::-webkit-slider-thumb,
+#fullProgressSlider::-webkit-slider-thumb,
+.volume-slider::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
+}
+
+.spotify-player {
+  gap: 10px;
+  padding-top: 14px;
+}
+.mini-player-open {
+  cursor: pointer;
+  min-width: 0;
+}
+
+.cart-license-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.cart-license-note strong { color: var(--text-primary); }
+
+.full-player-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 20px;
+}
+.full-player-volume i { color: var(--text-muted); }
+.full-player-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: stretch;
+}
+.full-player-actions button {
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 14px;
+}
+.full-player-cart-button {
+  position: relative;
+  min-width: 112px;
+}
+.full-player-cart-button .cart-badge {
+  top: 6px;
+  right: 10px;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.35);
+}
+
+@media (min-width: 768px) {
+  .beat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .full-player-overlay.active {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .beat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .beat-card {
+    grid-template-columns: 1fr;
+    grid-template-areas: "art" "info" "actions";
+  }
+  .beat-card-art {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+}
+
     
   </style>
 </head>
@@ -4052,20 +4244,12 @@ input[type="range"]:focus-visible {
       <i class="fas fa-music" aria-hidden="true"></i>
       <span>Samples</span>
     </button>
-    <button class="sidebar-nav-btn" data-tab="sync">
-      <i class="fas fa-film" aria-hidden="true"></i>
-      <span>Sync</span>
-    </button>
   </nav>
   <div class="sidebar-footer">
     <button class="sidebar-nav-btn" id="sidebarCartBtn" aria-label="View cart">
       <i class="fas fa-shopping-cart" aria-hidden="true"></i>
       <span>Cart</span>
       <span class="sidebar-badge" id="sidebarCartBadge">0</span>
-    </button>
-    <button class="sidebar-nav-btn" id="sidebarAuthBtn" aria-label="Account">
-      <i class="fas fa-user-circle" aria-hidden="true"></i>
-      <span>Account</span>
     </button>
   </div>
 </aside>
@@ -4089,11 +4273,9 @@ input[type="range"]:focus-visible {
   
   <!-- Right: Cart + Profile -->
   <div class="header-right">
-    <button id="cartNavBtn" title="Cart" aria-label="Open cart">
+    <button id="cartNavBtn" title="Cart" aria-label="Open cart" style="position:relative;">
       <i class="fas fa-shopping-cart" aria-hidden="true"></i>
-    </button>
-    <button id="authNavBtn" class="auth-btn" aria-label="Sign in or view account">
-      <i class="fas fa-user-circle" aria-hidden="true"></i>
+      <span class="cart-badge" id="cartBadge" aria-hidden="true">0</span>
     </button>
   </div>
 </header>
@@ -4104,7 +4286,6 @@ input[type="range"]:focus-visible {
   <button class="active" data-tab="beatstore">Beat Store</button>
   <button data-tab="beattapes">Beat Tapes</button>
   <button data-tab="samples">Samples</button>
-  <button data-tab="sync">Sync</button>
 </div>
 
 <div class="content-area">
@@ -4118,8 +4299,8 @@ input[type="range"]:focus-visible {
   <div class="beatstore-search" role="search" style="display:flex;align-items:center;background:rgba(255,255,255,0.06);border-radius:30px;border:1px solid var(--border-subtle);padding:0 16px;margin-bottom:12px;transition:0.3s;">
     <i class="fas fa-search" style="color:var(--text-muted);font-size:14px;" aria-hidden="true"></i>
     <input type="text" id="beatSearchInput" placeholder="Search beats..." aria-label="Search beats" style="flex:1;background:transparent;border:none;padding:10px 12px;color:var(--text-primary);font-size:14px;outline:none;min-width:0;" />
-    <button class="beat-search-btn" id="beatSearchBtn" aria-label="Search" style="background:var(--gradient-1);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;transition:0.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
-      <i class="fas fa-arrow-right" aria-hidden="true"></i>
+    <button class="beat-search-btn" id="beatSearchBtn" aria-label="Clear search" style="background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);width:32px;height:32px;border-radius:50%;cursor:pointer;transition:0.2s;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">
+      <i class="fas fa-times" aria-hidden="true"></i>
     </button>
   </div>
   <div class="beat-grid" id="beatStoreGrid"></div>
@@ -4135,11 +4316,6 @@ input[type="range"]:focus-visible {
       <div class="beat-grid" id="samplesGrid"></div>
     </div>
     
-    <!-- Sync Tab -->
-    <div class="tab-content" id="syncContent">
-      <div class="beat-grid" id="syncGrid"></div>
-    </div>
-
   </div>
 
   <!-- Keep playlist detail and other views -->
@@ -4184,18 +4360,13 @@ input[type="range"]:focus-visible {
   </div>
 
   <!-- Volume Row -->
-  <div class="volume-row">
-    <i class="fas fa-volume-up" id="volumeIcon" aria-hidden="true"></i>
-    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
-  </div>
-  
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;">
-    <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
-      <div id="playerArtwork" style="width:56px;height:56px;border-radius:8px;background:#2a2a3a;flex-shrink:0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);" aria-hidden="true">
-        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;">
-          <i class="fas fa-music"></i>
-        </div>
+  <div class="mini-player-open" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+    <div id="playerArtwork" style="width:56px;height:56px;border-radius:8px;background:#2a2a3a;flex-shrink:0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);" aria-hidden="true">
+      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:16px;background:#1a1a2e;">
+        <i class="fas fa-music"></i>
       </div>
+    </div>
       <div style="min-width:0;flex:1;">
         <div id="playerTitle" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" aria-live="polite">Select a beat</div>
         <div id="playerArtist" style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">MarcDBeats</div>
@@ -4210,18 +4381,6 @@ input[type="range"]:focus-visible {
   </button>
   <button id="playerNext" aria-label="Next beat" style="background:none;border:none;color:var(--text-secondary);font-size:28px;padding:8px 10px;cursor:pointer;border-radius:50%;transition:0.2s;display:flex;align-items:center;justify-content:center;">
     <i class="fas fa-step-forward" aria-hidden="true"></i>
-  </button>
-</div>
-    <div id="playerActions" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-  <button id="playerLike" aria-label="Like this beat" style="background:none;border:none;color:var(--text-muted);font-size:20px;padding:6px 8px;cursor:pointer;border-radius:50%;">
-    <i class="fas fa-heart" aria-hidden="true"></i>
-  </button>
-  <button id="playerAddToCart" aria-label="Add to cart" style="background:none;border:none;color:var(--text-muted);font-size:24px;padding:6px 8px;cursor:pointer;border-radius:50%;font-weight:300;">
-    <i class="fas fa-plus-circle" aria-hidden="true"></i>
-  </button>
-  <button id="playerCart" aria-label="View cart" style="background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;cursor:pointer;border-radius:50%;position:relative;">
-    <i class="fas fa-shopping-cart" aria-hidden="true"></i>
-    <span class="cart-badge" id="playerCartBadge" aria-hidden="true" style="position:absolute;top:-4px;right:-6px;background:var(--accent);color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;">0</span>
   </button>
 </div>
   </div>
@@ -4240,10 +4399,6 @@ input[type="range"]:focus-visible {
   <button class="bottom-nav-btn" data-tab="samples" aria-label="Samples">
     <i class="fas fa-music" aria-hidden="true"></i>
     <span>Samples</span>
-  </button>
-  <button class="bottom-nav-btn" data-tab="sync" aria-label="Sync">
-    <i class="fas fa-film" aria-hidden="true"></i>
-    <span>Sync</span>
   </button>
 </nav>
 
@@ -4283,10 +4438,14 @@ input[type="range"]:focus-visible {
     </div>
     
     <!-- Bottom Actions -->
-    <div class="full-player-actions">
-      <button id="fullPlayerLike" aria-label="Like this beat"><i class="fas fa-heart" aria-hidden="true"></i></button>
-      <button id="fullPlayerAddToCart" aria-label="Add to cart"><i class="fas fa-plus-circle" aria-hidden="true"></i></button>
-      <button id="fullPlayerCart" aria-label="View cart"><i class="fas fa-shopping-cart" aria-hidden="true"></i></button>
+    <div class="full-player-volume">
+      <i class="fas fa-volume-up" id="volumeIcon" aria-hidden="true"></i>
+      <input type="range" id="fullVolumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
+    </div>
+
+    <div class="full-player-actions" id="fullPlayerActions">
+      <button id="fullPlayerAddToCart" aria-label="Add to cart"><i class="fas fa-cart-plus" aria-hidden="true"></i><span>Add to Cart</span></button>
+      <button id="fullPlayerCart" aria-label="View cart" class="full-player-cart-button"><i class="fas fa-shopping-cart" aria-hidden="true"></i><span>Cart</span><span class="cart-badge" id="fullPlayerCartBadge" aria-hidden="true">0</span></button>
     </div>
   </div>
 </div>
