@@ -77,7 +77,7 @@
   const LIKE_COLOR_ACTIVE = '#22c55e'; // green used for active like buttons
 
   const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
-  const CACHE_VERSION = 'v1'; // Bump this whenever the cached data shape changes
+  const CACHE_VERSION = 'v2'; // Bump this whenever the cached data shape changes
 
   // =============================================================
   // 📦 OPTIONAL EXTERNAL SERVICES
@@ -437,7 +437,7 @@
 
   function updateCartButtons() {
     document.querySelectorAll('.cart-action[data-beat-id]').forEach(button => {
-      const beatId = parseInt(button.dataset.beatId, 10);
+      const beatId = button.dataset.beatId;
       const inCart = isBeatInCart(beatId);
       button.classList.toggle('in-cart', inCart);
       button.setAttribute('aria-pressed', inCart ? 'true' : 'false');
@@ -468,9 +468,8 @@
 
   // Returns all cart buttons on the page for a specific beat
   function getCartButtonsForBeat(beatId) {
-    const safeId = parseInt(beatId, 10);
-    if (isNaN(safeId)) return [];
-    return document.querySelectorAll(`.cart-action[data-beat-id="${safeId}"]`);
+    if (!beatId) return [];
+    return document.querySelectorAll(`.cart-action[data-beat-id="${beatId}"]`);
   }
 
   function addToCart(beatId) {
@@ -615,7 +614,7 @@
     }
 
     state.beats = data.records.map(record => ({
-  id: parseInt(record.id, 36),
+  id: record.id,
   title: record.fields['Beat Name'] || 'Untitled',
   artist: record.fields['Artist'] || 'Unknown',
   genre: record.fields['Genre'] || '',
@@ -802,8 +801,7 @@ function renderCard(beat, index, queue) {
   // 🎯 NOW PLAYING — highlight the current beat across all lists
   // =============================================================
   function updateNowPlayingUI(beatId) {
-    const safeId = parseInt(beatId, 10);
-    if (isNaN(safeId)) return;
+    if (!beatId) return;
     
     // Remove playing class from all
     document.querySelectorAll('.beat-card.playing, .track-item.playing').forEach(el => {
@@ -811,7 +809,7 @@ function renderCard(beat, index, queue) {
     });
     
     // Add playing class to the current beat
-    document.querySelectorAll(`.beat-card[data-beat-id="${safeId}"], .track-item[data-beat-id="${safeId}"]`).forEach(el => {
+    document.querySelectorAll(`.beat-card[data-beat-id="${beatId}"], .track-item[data-beat-id="${beatId}"]`).forEach(el => {
       el.classList.add('playing');
     });
   }
@@ -1050,7 +1048,7 @@ function renderCard(beat, index, queue) {
 
     document.querySelectorAll('.cart-item-remove').forEach(btn => {
       btn.addEventListener('click', () => {
-        const beatId = parseInt(btn.dataset.beatId);
+        const beatId = btn.dataset.beatId;
         removeFromCart(beatId);
       });
     });
@@ -1264,8 +1262,8 @@ function renderCard(beat, index, queue) {
       if (!item) return;
       if (e.target.closest('button')) return;
 
-      const beatId = parseInt(item.dataset.beatId, 10);
-      if (isNaN(beatId)) return;
+      const beatId = item.dataset.beatId;
+      if (!beatId) return;
 
       const beatIndex = playlist.beats.findIndex(track => track.id === beatId);
       if (beatIndex === -1) return;
@@ -1280,8 +1278,8 @@ function renderCard(beat, index, queue) {
       if (!cartBtn) return;
 
       e.stopPropagation();
-      const beatId = parseInt(cartBtn.dataset.beatId, 10);
-      if (isNaN(beatId)) return;
+      const beatId = cartBtn.dataset.beatId;
+      if (!beatId) return;
 
       addToCart(beatId);
     });
@@ -1421,14 +1419,14 @@ function renderCard(beat, index, queue) {
 
     content.querySelectorAll('.buy-sm').forEach(btn => {
       btn.addEventListener('click', () => {
-        const beatId = parseInt(btn.dataset.beatId);
+        const beatId = btn.dataset.beatId;
         handleBuy(beatId);
       });
     });
 
     content.querySelectorAll('.remove-sm').forEach(btn => {
       btn.addEventListener('click', () => {
-        const beatId = parseInt(btn.dataset.beatId);
+        const beatId = btn.dataset.beatId;
         toggleLike(beatId);
         renderPortal();
         updateUI();
@@ -1911,8 +1909,8 @@ function attachBeatCardEvents(grid) {
       return;
     }
 
-    const beatId = parseInt(card.dataset.beatId, 10);
-    if (isNaN(beatId)) {
+    const beatId = card.dataset.beatId;
+    if (!beatId) {
       console.error('❌ Invalid beatId:', card.dataset.beatId);
       return;
     }
@@ -1940,8 +1938,8 @@ function attachBeatCardEvents(grid) {
     if (!cartBtn) return;
 
     e.stopPropagation();
-    const beatId = parseInt(cartBtn.dataset.beatId, 10);
-    if (isNaN(beatId)) return;
+    const beatId = cartBtn.dataset.beatId;
+    if (!beatId) return;
 
     console.log('🛒 Adding to cart:', beatId);
     addToCart(beatId);
