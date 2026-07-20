@@ -1276,24 +1276,30 @@ function renderCard(beat, index, queue) {
       </div>
     `).join('');
 
-    tracklist.querySelectorAll('.track-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
-        const beatId = parseInt(item.dataset.beatId, 10);
-        const beat = playlist.beats.find(track => track.id === beatId);
-        if (beat) {
-          renderCard(beat, beats.indexOf(beat), beats);
-          updateNowPlayingUI(beat.id);
-        }
-      });
+    tracklist.addEventListener('click', function(e) {
+      const item = e.target.closest('.track-item');
+      if (!item) return;
+      if (e.target.closest('button')) return;
+
+      const beatId = parseInt(item.dataset.beatId, 10);
+      if (isNaN(beatId)) return;
+
+      const beat = playlist.beats.find(track => track.id === beatId);
+      if (beat) {
+        renderCard(beat, playlist.beats.indexOf(beat), playlist.beats);
+        updateNowPlayingUI(beat.id);
+      }
     });
 
-    tracklist.querySelectorAll('.cart-action').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const beatId = parseInt(btn.dataset.beatId, 10);
-        addToCart(beatId);
-      });
+    tracklist.addEventListener('click', function(e) {
+      const cartBtn = e.target.closest('.cart-action');
+      if (!cartBtn) return;
+
+      e.stopPropagation();
+      const beatId = parseInt(cartBtn.dataset.beatId, 10);
+      if (isNaN(beatId)) return;
+
+      addToCart(beatId);
     });
 
     document.getElementById('playlistDetail').classList.add('active');
@@ -1928,22 +1934,39 @@ function renderSamples() {
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
-  const beatStoreQueue = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
-  document.querySelectorAll('.beat-card').forEach(card => {
-    const freshCard = card.cloneNode(true);
-    card.replaceWith(freshCard);
+  const grid = document.getElementById('beatStoreGrid');
+  if (!grid) return;
 
-    const beatId = parseInt(freshCard.dataset.beatId, 10);
-    freshCard.addEventListener('click', event => {
-      if (event.target.closest('button')) return;
-      const beat = getBeat(beatId);
-      if (beat) renderCard(beat, beatStoreQueue.indexOf(beat), beatStoreQueue);
-    });
+  const newGrid = grid.cloneNode(true);
+  grid.parentNode.replaceChild(newGrid, grid);
 
-    freshCard.querySelector('.cart-action')?.addEventListener('click', event => {
-      event.stopPropagation();
-      addToCart(beatId);
-    });
+  newGrid.addEventListener('click', function(e) {
+    const card = e.target.closest('.beat-card');
+    if (!card) return;
+    if (e.target.closest('button')) return;
+
+    const beatId = parseInt(card.dataset.beatId, 10);
+    if (isNaN(beatId)) return;
+
+    const beat = getBeat(beatId);
+    if (!beat) return;
+
+    const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
+    const index = beatStoreQueue.findIndex(b => b.id === beatId);
+    if (index === -1) return;
+
+    renderCard(beat, index, beatStoreQueue);
+  });
+
+  newGrid.addEventListener('click', function(e) {
+    const cartBtn = e.target.closest('.cart-action');
+    if (!cartBtn) return;
+
+    e.stopPropagation();
+    const beatId = parseInt(cartBtn.dataset.beatId, 10);
+    if (isNaN(beatId)) return;
+
+    addToCart(beatId);
   });
 
   updateCartButtons();
