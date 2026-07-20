@@ -709,6 +709,7 @@ function renderCard(beat, index, queue) {
   }
   
   console.log('🎵 renderCard called for:', beat.title);
+  console.log('📊 Queue length:', queue ? queue.length : 'no queue');
   
   // Remember what's playing
   state.playerQueue = queue || state.beats;
@@ -801,11 +802,18 @@ function renderCard(beat, index, queue) {
   // 🎯 NOW PLAYING — highlight the current beat across all lists
   // =============================================================
   function updateNowPlayingUI(beatId) {
-    // Ensure beatId is a safe integer before interpolating into a CSS selector
     const safeId = parseInt(beatId, 10);
     if (isNaN(safeId)) return;
-    document.querySelectorAll('.beat-card.playing, .track-item.playing').forEach(el => el.classList.remove('playing'));
-    document.querySelectorAll(`.beat-card[data-beat-id="${safeId}"], .track-item[data-beat-id="${safeId}"]`).forEach(el => el.classList.add('playing'));
+    
+    // Remove playing class from all
+    document.querySelectorAll('.beat-card.playing, .track-item.playing').forEach(el => {
+      el.classList.remove('playing');
+    });
+    
+    // Add playing class to the current beat
+    document.querySelectorAll(`.beat-card[data-beat-id="${safeId}"], .track-item[data-beat-id="${safeId}"]`).forEach(el => {
+      el.classList.add('playing');
+    });
   }
 
   // =============================================================
@@ -1737,11 +1745,19 @@ function renderSamples() {
 }
 
 function renderBeatStore() {
+  console.log('🔄 renderBeatStore called');
+  
   const grid = document.getElementById('beatStoreGrid');
-  if (!grid) return;
+  if (!grid) {
+    console.error('❌ beatStoreGrid not found!');
+    return;
+  }
+  
   updateSearchClearButton();
 
   const beats = getBeatStoreBeats().filter(beat => beatMatchesSearch(beat));
+  console.log('📊 Found', beats.length, 'beats to display');
+  
   if (beats.length === 0) {
     renderEmptyState(
       grid,
@@ -1749,19 +1765,13 @@ function renderBeatStore() {
       state.searchQuery ? 'No matching beats' : 'No beats yet',
       state.searchQuery ? 'Try another search term.' : 'Featured beats will appear here.'
     );
+    // Still need to attach listeners for empty state
+    attachBeatCardEvents(grid);
     return;
   }
 
-  // Store the current grid reference before rebuilding
-  const gridParent = grid.parentNode;
-  
-  // Create a new grid element
-  const newGrid = document.createElement('div');
-  newGrid.id = 'beatStoreGrid';
-  newGrid.className = 'beat-grid';
-  
-  // Build the HTML
-  newGrid.innerHTML = beats.map(beat => `
+  // Build the HTML directly on the existing grid
+  grid.innerHTML = beats.map(beat => `
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
         <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
@@ -1781,12 +1791,13 @@ function renderBeatStore() {
     </div>
   `).join('');
 
-  // Replace the old grid with the new one
-  gridParent.replaceChild(newGrid, grid);
-
-  // Attach events to the new grid
-  attachBeatCardEvents(newGrid);
+  console.log('✅ Grid HTML built, attaching events...');
+  
+  // Attach events to the grid
+  attachBeatCardEvents(grid);
   state.currentPlaylist = 'featured';
+  
+  console.log('✅ renderBeatStore complete');
 }
 
 function renderBeatTapes() {
@@ -1865,37 +1876,65 @@ function renderSamples() {
   renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
 }
 
-// Tracks whether beat store grid listeners have been attached
-
 // Helper: Attach events to beat cards
 function attachBeatCardEvents(grid) {
+  console.log('📌 attachBeatCardEvents called');
+  
   // If no grid provided, try to find it
   if (!grid) {
     grid = document.getElementById('beatStoreGrid');
-    if (!grid) return;
+    if (!grid) {
+      console.error('❌ beatStoreGrid not found!');
+      return;
+    }
   }
+  
+  console.log('✅ Grid found, attaching listeners...');
 
-  // Click on card = play beat
+  // Remove any existing listeners by cloning
+  const parent = grid.parentNode;
+  const newGrid = grid.cloneNode(true);
+  parent.replaceChild(newGrid, grid);
+  grid = newGrid;
+
+  // --- CLICK ON CARD = PLAY BEAT ---
   grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
-    if (!card) return;
-    if (e.target.closest('button')) return;
+    if (!card) {
+      console.log('⚠️ Click not on a beat-card');
+      return;
+    }
+    
+    // Don't trigger if clicking on a button
+    if (e.target.closest('button')) {
+      console.log('⚠️ Click was on a button, ignoring');
+      return;
+    }
 
     const beatId = parseInt(card.dataset.beatId, 10);
-    if (isNaN(beatId)) return;
+    if (isNaN(beatId)) {
+      console.error('❌ Invalid beatId:', card.dataset.beatId);
+      return;
+    }
 
     const beat = getBeat(beatId);
-    if (!beat) return;
+    if (!beat) {
+      console.error('❌ Beat not found for ID:', beatId);
+      return;
+    }
 
     const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
-    if (index === -1) return;
+    if (index === -1) {
+      console.error('❌ Beat not in queue:', beatId);
+      return;
+    }
 
     console.log('🎵 Playing beat from card click:', beat.title);
     renderCard(beat, index, beatStoreQueue);
   });
 
-  // Click on cart button = add to cart
+  // --- CLICK ON CART BUTTON = ADD TO CART ---
   grid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
@@ -1904,9 +1943,11 @@ function attachBeatCardEvents(grid) {
     const beatId = parseInt(cartBtn.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
+    console.log('🛒 Adding to cart:', beatId);
     addToCart(beatId);
   });
 
+  console.log('✅ Listeners attached successfully!');
   updateCartButtons();
 }
 
