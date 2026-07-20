@@ -1933,18 +1933,29 @@ function renderSamples() {
   renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
 }
 
+// Tracks whether beat store grid listeners have been attached
+let _beatStoreListenersAttached = false;
+
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
 
-  const newGrid = grid.cloneNode(true);
-  grid.parentNode.replaceChild(newGrid, grid);
-  const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
+  // If we've already attached listeners, just update cart buttons and return
+  if (_beatStoreListenersAttached) {
+    updateCartButtons();
+    return;
+  }
 
-  newGrid.addEventListener('click', function(e) {
+  // Mark that we've attached listeners to prevent duplicates
+  _beatStoreListenersAttached = true;
+
+  // --- Card click: Play beat ---
+  grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
     if (!card) return;
+
+    // Don't trigger if clicking on a button (cart, etc.)
     if (e.target.closest('button')) return;
 
     const beatId = parseInt(card.dataset.beatId, 10);
@@ -1953,23 +1964,27 @@ function attachBeatCardEvents() {
     const beat = getBeat(beatId);
     if (!beat) return;
 
+    // Recompute the queue each click so search/filter state is always current
+    const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
 
     renderCard(beat, index, beatStoreQueue);
   });
 
-  newGrid.addEventListener('click', function(e) {
+  // --- Cart button click: Add to cart ---
+  grid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
 
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent card click from also firing
     const beatId = parseInt(cartBtn.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
     addToCart(beatId);
   });
 
+  // Update cart button states
   updateCartButtons();
 }
 
