@@ -1934,7 +1934,7 @@ function renderSamples() {
 }
 
 // Tracks whether beat store grid listeners have been attached
-const _beatStoreListenersAttached = new Set();
+let _beatStoreListenersAttached = false;
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
@@ -1942,13 +1942,13 @@ function attachBeatCardEvents() {
   if (!grid) return;
 
   // If we've already attached listeners, just update cart buttons and return
-  if (_beatStoreListenersAttached.has(grid)) {
+  if (_beatStoreListenersAttached) {
     updateCartButtons();
     return;
   }
 
   // Mark that we've attached listeners to prevent duplicates
-  _beatStoreListenersAttached.add(grid);
+  _beatStoreListenersAttached = true;
 
   // --- Card click: Play beat ---
   grid.addEventListener('click', function(e) {
@@ -1964,7 +1964,7 @@ function attachBeatCardEvents() {
     const beat = getBeat(beatId);
     if (!beat) return;
 
-    // Get the current queue based on search/filter state
+    // Recompute the queue each click so search/filter state is always current
     const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
