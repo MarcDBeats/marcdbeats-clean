@@ -1830,6 +1830,7 @@ function renderBeatStore() {
       state.searchQuery ? 'No matching beats' : 'No beats yet',
       state.searchQuery ? 'Try another search term.' : 'Featured beats will appear here.'
     );
+    attachBeatCardEvents();
     return;
   }
 
@@ -1934,28 +1935,20 @@ function renderSamples() {
 }
 
 // Tracks whether beat store grid listeners have been attached
-let _beatStoreListenersAttached = false;
 
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
 
-  // If we've already attached listeners, just update cart buttons and return
-  if (_beatStoreListenersAttached) {
-    updateCartButtons();
-    return;
-  }
+  // Remove old listeners by cloning the grid
+  const newGrid = grid.cloneNode(true);
+  grid.parentNode.replaceChild(newGrid, grid);
 
-  // Mark that we've attached listeners to prevent duplicates
-  _beatStoreListenersAttached = true;
-
-  // --- Card click: Play beat ---
-  grid.addEventListener('click', function(e) {
+  // Click on card = play beat
+  newGrid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
     if (!card) return;
-
-    // Don't trigger if clicking on a button (cart, etc.)
     if (e.target.closest('button')) return;
 
     const beatId = parseInt(card.dataset.beatId, 10);
@@ -1964,7 +1957,6 @@ function attachBeatCardEvents() {
     const beat = getBeat(beatId);
     if (!beat) return;
 
-    // Recompute the queue each click so search/filter state is always current
     const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
@@ -1972,19 +1964,18 @@ function attachBeatCardEvents() {
     renderCard(beat, index, beatStoreQueue);
   });
 
-  // --- Cart button click: Add to cart ---
-  grid.addEventListener('click', function(e) {
+  // Click on cart button = add to cart
+  newGrid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
 
-    e.stopPropagation(); // Prevent card click from also firing
+    e.stopPropagation();
     const beatId = parseInt(cartBtn.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
     addToCart(beatId);
   });
 
-  // Update cart button states
   updateCartButtons();
 }
 
