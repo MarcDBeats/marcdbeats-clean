@@ -1933,19 +1933,22 @@ function renderSamples() {
   renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
 }
 
+// Tracks whether beat store grid listeners have been attached
+const _beatStoreListenersAttached = new Set();
+
 // Helper: Attach events to beat cards
 function attachBeatCardEvents() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
 
   // If we've already attached listeners, just update cart buttons and return
-  if (grid._listenersAttached) {
+  if (_beatStoreListenersAttached.has(grid)) {
     updateCartButtons();
     return;
   }
 
   // Mark that we've attached listeners to prevent duplicates
-  grid._listenersAttached = true;
+  _beatStoreListenersAttached.add(grid);
 
   // --- Card click: Play beat ---
   grid.addEventListener('click', function(e) {
@@ -1966,7 +1969,7 @@ function attachBeatCardEvents() {
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
 
-    renderCard(beat, state.beats.indexOf(beat), beatStoreQueue);
+    renderCard(beat, index, beatStoreQueue);
   });
 
   // --- Cart button click: Add to cart ---
