@@ -1938,13 +1938,21 @@ function attachBeatCardEvents() {
   const grid = document.getElementById('beatStoreGrid');
   if (!grid) return;
 
-  const newGrid = grid.cloneNode(true);
-  grid.parentNode.replaceChild(newGrid, grid);
-  const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
+  // If we've already attached listeners, just update cart buttons and return
+  if (grid._listenersAttached) {
+    updateCartButtons();
+    return;
+  }
 
-  newGrid.addEventListener('click', function(e) {
+  // Mark that we've attached listeners to prevent duplicates
+  grid._listenersAttached = true;
+
+  // --- Card click: Play beat ---
+  grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
     if (!card) return;
+
+    // Don't trigger if clicking on a button (cart, etc.)
     if (e.target.closest('button')) return;
 
     const beatId = parseInt(card.dataset.beatId, 10);
@@ -1953,23 +1961,27 @@ function attachBeatCardEvents() {
     const beat = getBeat(beatId);
     if (!beat) return;
 
+    // Get the current queue based on search/filter state
+    const beatStoreQueue = getBeatStoreBeats().filter(b => beatMatchesSearch(b));
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
 
-    renderCard(beat, index, beatStoreQueue);
+    renderCard(beat, state.beats.indexOf(beat), beatStoreQueue);
   });
 
-  newGrid.addEventListener('click', function(e) {
+  // --- Cart button click: Add to cart ---
+  grid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
 
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent card click from also firing
     const beatId = parseInt(cartBtn.dataset.beatId, 10);
     if (isNaN(beatId)) return;
 
     addToCart(beatId);
   });
 
+  // Update cart button states
   updateCartButtons();
 }
 
