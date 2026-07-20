@@ -1783,7 +1783,6 @@ function renderBeatTapes() {
     });
   });
 }
-
 function renderSamples() {
   const grid = document.getElementById('samplesGrid');
   if (!grid) return;
@@ -1814,7 +1813,8 @@ function renderSamples() {
   </div>
 `).join('');
   
-  attachBeatCardEvents();
+  // Pass the grid to attachBeatCardEvents
+  attachBeatCardEvents(grid);
 }
 
 function renderBeatStore() {
@@ -1830,11 +1830,19 @@ function renderBeatStore() {
       state.searchQuery ? 'No matching beats' : 'No beats yet',
       state.searchQuery ? 'Try another search term.' : 'Featured beats will appear here.'
     );
-    attachBeatCardEvents();
     return;
   }
 
-  grid.innerHTML = beats.map(beat => `
+  // Store the current grid reference before rebuilding
+  const gridParent = grid.parentNode;
+  
+  // Create a new grid element
+  const newGrid = document.createElement('div');
+  newGrid.id = 'beatStoreGrid';
+  newGrid.className = 'beat-grid';
+  
+  // Build the HTML
+  newGrid.innerHTML = beats.map(beat => `
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
         <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
@@ -1854,7 +1862,11 @@ function renderBeatStore() {
     </div>
   `).join('');
 
-  attachBeatCardEvents();
+  // Replace the old grid with the new one
+  gridParent.replaceChild(newGrid, grid);
+
+  // Attach events to the new grid
+  attachBeatCardEvents(newGrid);
   state.currentPlaylist = 'featured';
 }
 
@@ -1937,16 +1949,15 @@ function renderSamples() {
 // Tracks whether beat store grid listeners have been attached
 
 // Helper: Attach events to beat cards
-function attachBeatCardEvents() {
-  const grid = document.getElementById('beatStoreGrid');
-  if (!grid) return;
-
-  // Remove old listeners by cloning the grid
-  const newGrid = grid.cloneNode(true);
-  grid.parentNode.replaceChild(newGrid, grid);
+function attachBeatCardEvents(grid) {
+  // If no grid provided, try to find it
+  if (!grid) {
+    grid = document.getElementById('beatStoreGrid');
+    if (!grid) return;
+  }
 
   // Click on card = play beat
-  newGrid.addEventListener('click', function(e) {
+  grid.addEventListener('click', function(e) {
     const card = e.target.closest('.beat-card');
     if (!card) return;
     if (e.target.closest('button')) return;
@@ -1961,11 +1972,12 @@ function attachBeatCardEvents() {
     const index = beatStoreQueue.findIndex(b => b.id === beatId);
     if (index === -1) return;
 
+    console.log('🎵 Playing beat from card click:', beat.title);
     renderCard(beat, index, beatStoreQueue);
   });
 
   // Click on cart button = add to cart
-  newGrid.addEventListener('click', function(e) {
+  grid.addEventListener('click', function(e) {
     const cartBtn = e.target.closest('.cart-action');
     if (!cartBtn) return;
 
