@@ -59,7 +59,9 @@ module.exports = async function handler(req, res) {
     }
     const requestedReference = typeof body.clientReferenceId === 'string' ? body.clientReferenceId : '';
     const safeReference = buildClientReferenceId(safeBeats);
-    const clientReferenceId = requestedReference && requestedReference.length <= 100 ? requestedReference : safeReference;
+    const sanitizedReference = requestedReference.trim();
+    const isSafeReference = /^[A-Za-z0-9_-]{1,100}$/.test(sanitizedReference);
+    const clientReferenceId = isSafeReference ? sanitizedReference : safeReference;
 
     const params = new URLSearchParams();
     params.append('mode', 'payment');
@@ -103,6 +105,9 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({ sessionId: stripeData.id, url: stripeData.url || null });
   } catch (error) {
+    if (error?.name === 'AbortError') {
+      return res.status(504).json({ error: 'Checkout provider timed out. Please try again.' });
+    }
     return res.status(500).json({ error: error?.message || 'Unexpected server error' });
   }
 };
