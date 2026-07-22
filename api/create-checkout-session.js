@@ -15,12 +15,30 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    let parsedBody = req.body || {};
+    if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body || '{}');
+      } catch {
+        return res.status(400).json({ error: 'Invalid JSON payload.' });
+      }
+    }
+    const body = parsedBody;
     const beats = Array.isArray(body.beats) ? body.beats : [];
     const origin = typeof body.origin === 'string' && /^https?:\/\//.test(body.origin)
       ? body.origin
       : 'https://marcdbeats.com';
-    const clientReferenceId = typeof body.clientReferenceId === 'string' ? body.clientReferenceId.slice(0, 100) : '';
+    const buildClientReferenceId = (beats, maxLength = 100) => {
+      let reference = '';
+      for (const beat of beats) {
+        const id = String(beat?.id || '').trim();
+        if (!id) continue;
+        const candidate = reference ? `${reference}_${id}` : id;
+        if (candidate.length > maxLength) break;
+        reference = candidate;
+      }
+      return reference;
+    };
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';
     const unitAmount = Number.isFinite(body.unitAmount) ? Math.round(body.unitAmount) : 1999;
 
@@ -39,6 +57,9 @@ module.exports = async function handler(req, res) {
     if (safeBeats.length === 0) {
       return res.status(400).json({ error: 'No valid beats were provided.' });
     }
+    const requestedReference = typeof body.clientReferenceId === 'string' ? body.clientReferenceId : '';
+    const safeReference = buildClientReferenceId(safeBeats);
+    const clientReferenceId = requestedReference && requestedReference.length <= 100 ? requestedReference : safeReference;
 
     const params = new URLSearchParams();
     params.append('mode', 'payment');
@@ -60,14 +81,17 @@ module.exports = async function handler(req, res) {
     params.append('metadata[beat_titles]', safeBeats.map((beat) => beat.title).join(' | '));
     if (memberId) params.append('metadata[member_id]', memberId);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + stripeSecretKey,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: params.toString()
-    });
+      body: params.toString(),
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
 
     const stripeData = await stripeResponse.json();
 

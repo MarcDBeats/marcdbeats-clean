@@ -1086,6 +1086,18 @@ function renderCard(beat, index, queue) {
     updateCartTotal();
   }
 
+  function buildCheckoutReference(beats, maxLength = 100) {
+    let reference = '';
+    for (const beat of beats) {
+      const id = String(beat?.id || '').trim();
+      if (!id) continue;
+      const candidate = reference ? `${reference}_${id}` : id;
+      if (candidate.length > maxLength) break;
+      reference = candidate;
+    }
+    return reference;
+  }
+
   async function startStripeCheckout(beats) {
     if (!stripe) {
       showToast('Stripe is unavailable right now. Please refresh and try again.', 'fa-exclamation-circle');
@@ -1106,7 +1118,7 @@ function renderCard(beat, index, queue) {
     }
 
     const modalOverlay = document.getElementById('modalOverlay');
-    const clientReferenceId = safeBeats.map(beat => beat.id).join('_').substring(0, 100);
+    const clientReferenceId = buildCheckoutReference(safeBeats);
     const unitAmount = Math.round(BEAT_PRICE * 100);
 
     try {
@@ -1130,6 +1142,7 @@ function renderCard(beat, index, queue) {
       modalOverlay?.classList.remove('active');
       const result = await stripe.redirectToCheckout({ sessionId: data.sessionId });
       if (result?.error?.message) {
+        logger.error('stripe:redirect-error', { error: result.error });
         showToast(result.error.message, 'fa-exclamation-circle');
       }
     } catch (error) {
