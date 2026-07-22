@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>MarcDBeats — Exclusive Beats for Creators</title>
-  <meta name="description" content="MarcDBeats — exclusive beats for creators. Browse, preview and license quality beats." />
-  <meta property="og:title" content="MarcDBeats — Exclusive Beats for Creators" />
-  <meta property="og:description" content="Exclusive beats for creators. Browse, preview and license quality beats from MarcDBeats." />
+  <title>MarcDBeats — Exclusive Beats for Artists</title>
+  <meta name="description" content="MarcDBeats — exclusive beats for artists. Browse, preview and license quality beats." />
+  <meta property="og:title" content="MarcDBeats — Exclusive Beats for Artists" />
+  <meta property="og:description" content="Exclusive beats for artists. Browse, preview and license quality beats from MarcDBeats." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#0a0a0f" />
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
@@ -91,6 +91,16 @@
   // Browser-safe publishable Stripe key; the secret key must remain server-side only.
   const STRIPE_PUBLISHABLE_KEY = 'pk_live_9tzMrYX8TutSUzuk5VI7XMLD';
   const stripe = window.Stripe ? Stripe(STRIPE_PUBLISHABLE_KEY) : null;
+
+  // =============================================================
+  // 💳 STRIPE PAYMENT LINK
+  // To accept payments:
+  //   1. Go to dashboard.stripe.com → Payment Links → Create link
+  //   2. Add your "Standard License – $19.99" product
+  //   3. Enable "Allow customers to adjust quantity"
+  //   4. Paste the generated link below (format: https://buy.stripe.com/XXXXXXXX)
+  // =============================================================
+  const STRIPE_PAYMENT_LINK = ''; // ← Paste your Stripe Payment Link here
   
   // =============================================================
   // 📦 STATE
@@ -204,13 +214,18 @@
   
   Object.keys(seriesMap).forEach(key => {
     seriesMap[key].sort((a, b) => {
-      return (a.seriesNumber || 999) - (b.seriesNumber || 999);
+      return (b.seriesNumber || 0) - (a.seriesNumber || 0);
     });
   });
   
   const sortedSeries = {};
   Object.keys(seriesMap)
     .sort((a, b) => {
+      // "Got Beats" series always appears first
+      const aIsGotBeats = a.toLowerCase().includes('got beats');
+      const bIsGotBeats = b.toLowerCase().includes('got beats');
+      if (aIsGotBeats && !bIsGotBeats) return -1;
+      if (!aIsGotBeats && bIsGotBeats) return 1;
       const minA = Math.min(...seriesMap[a].map(p => p.seriesNumber || 999));
       const minB = Math.min(...seriesMap[b].map(p => p.seriesNumber || 999));
       return minA - minB;
@@ -675,7 +690,7 @@ state.playlists = playlistIds.map(id => {
     hideLoadingSpinner();
 
     logger.info('data:loaded', { beats: state.beats.length, playlists: state.playlists.length, singles: state.singles.length, featured: state.featured.length });
-    showToast(`Loaded ${state.beats.length} beats!`, 'fa-check-circle');
+    // Startup toast removed per design preference
   } catch (error) {
     logger.error('fetch:failure', error.message);
     state.loaded = true;
@@ -1010,9 +1025,8 @@ function renderCard(beat, index, queue) {
       <h2>Your Cart (${state.cart.length})</h2>
       <p class="sub">All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each</p>
       <div class="cart-license-note">
-        <strong>Terms & Conditions required before payment opens.</strong>
-        <span>Checkout is open to everyone. Payment processing stays disabled until the UI is finalized.</span>
-        <span>Need something custom? Email admin@marcdbeats.com for exclusive beats.</span>
+        <strong>Standard License:</strong> $${BEAT_PRICE.toFixed(2)} per beat
+        <span>For exclusive beats, email admin@marcdbeats.com.</span>
       </div>
       ${state.cart.map(beat => `
   <div style="padding:12px 0;border-bottom:1px solid var(--border-subtle);">
@@ -1084,25 +1098,83 @@ function renderCard(beat, index, queue) {
     if (!modalBox) return;
 
     const total = state.cart.length * BEAT_PRICE;
+    const beatList = state.cart.map(b => b.title).join(', ');
+
     modalBox.innerHTML = `
-      <h2>Checkout Preview</h2>
-      <p class="sub">Everything is ready for guest checkout once payments are enabled.</p>
-      <div class="cart-license-note">
-        <strong>Terms & Conditions</strong>
-        <span>All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each.</span>
-        <span>For exclusive beats, email admin@marcdbeats.com.</span>
+      <h2>Checkout</h2>
+      <p class="sub">${state.cart.length} beat${state.cart.length === 1 ? '' : 's'} · ${formatPrice(total)}</p>
+
+      <div class="cart-license-note" style="margin-bottom:0;">
+        <strong>Standard License Terms</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border-subtle);">
-        <span>${state.cart.length} item${state.cart.length === 1 ? '' : 's'}</span>
-        <strong>${formatPrice(total)}</strong>
+
+      <div id="tcScroll" style="max-height:220px;overflow-y:auto;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--text-secondary);line-height:1.6;margin:12px 0;">
+        <p style="margin:0 0 8px;"><strong>Price:</strong> $19.99 per beat</p>
+
+        <p style="margin:0 0 4px;"><strong>✅ WHAT YOU CAN DO:</strong></p>
+        <ul style="margin:0 0 10px;padding-left:18px;">
+          <li>Use the beat in videos for YouTube, Instagram, TikTok, Facebook, and similar social media platforms</li>
+          <li>Use in podcasts and streaming audio content</li>
+          <li>Monetize your content (up to 1,000,000 streams/views)</li>
+          <li>Use in 1 commercial project (one song, one video, or one campaign)</li>
+          <li>Worldwide usage rights</li>
+          <li>Lifetime usage (no expiration)</li>
+          <li>Post on Spotify, Apple Music, SoundCloud (with credits)</li>
+        </ul>
+
+        <p style="margin:0 0 4px;"><strong>❌ WHAT YOU CANNOT DO:</strong></p>
+        <ul style="margin:0 0 10px;padding-left:18px;">
+          <li>Claim ownership of the beat or register it with a PRO (BMI, ASCAP, etc.)</li>
+          <li>Resell the beat or distribute it as your own</li>
+          <li>Use in TV, film, or video games (requires exclusive license)</li>
+          <li>Sample or remix the beat without permission</li>
+          <li>Transfer the license to another person or company</li>
+          <li>Use the beat in multiple projects (one song per license)</li>
+          <li>Register the composition as your own</li>
+        </ul>
+
+        <p style="margin:0 0 4px;"><strong>📋 ADDITIONAL TERMS:</strong></p>
+        <ul style="margin:0;padding-left:18px;">
+          <li><strong>Credit Required:</strong> You must credit "MarcDBeats" in your video description or metadata.</li>
+          <li><strong>Exclusive Rights:</strong> This is a non-exclusive license. The beat may be sold to other artists. For exclusive rights, contact admin@marcdbeats.com.</li>
+          <li><strong>Refund Policy:</strong> All sales are final due to the digital nature of the product.</li>
+          <li><strong>Liability:</strong> MarcDBeats is not responsible for any claims or disputes arising from your use of the beat.</li>
+        </ul>
       </div>
-      <button class="btn-primary" id="checkoutPreviewBtn" style="margin-top:16px;">Payment Coming Soon</button>
-      <button class="btn-secondary" id="closeCheckoutPreview">Back to Cart</button>
+
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 0;font-size:14px;color:var(--text-secondary);">
+        <input type="checkbox" id="tcAgree" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:var(--accent);" />
+        I have read and agree to the Standard License Terms & Conditions above.
+      </label>
+
+      <button class="btn-primary" id="proceedPaymentBtn" style="margin-top:4px;" disabled>
+        <i class="fas fa-lock"></i> Proceed to Payment
+      </button>
+      <button class="btn-secondary" id="closeCheckoutPreview" style="margin-top:8px;">Back to Cart</button>
     `;
 
-    document.getElementById('checkoutPreviewBtn')?.addEventListener('click', () => {
-      showToast('Payment processing will be enabled after the UI review.', 'fa-info-circle');
+    const agreeBox = document.getElementById('tcAgree');
+    const payBtn = document.getElementById('proceedPaymentBtn');
+
+    agreeBox.addEventListener('change', function() {
+      payBtn.disabled = !this.checked;
     });
+
+    payBtn.addEventListener('click', () => {
+      if (!agreeBox.checked) return;
+      if (STRIPE_PAYMENT_LINK) {
+        // Redirect to Stripe Payment Link — quantity param lets user adjust on Stripe page
+        const url = new URL(STRIPE_PAYMENT_LINK);
+        url.searchParams.set('quantity', state.cart.length);
+        // Pass beat titles as a client reference (visible in Stripe dashboard)
+        url.searchParams.set('client_reference_id', state.cart.map(b => b.id).join('_'));
+        document.getElementById('modalOverlay')?.classList.remove('active');
+        window.open(url.toString(), '_blank');
+      } else {
+        showToast('Payment link not configured — see STRIPE_PAYMENT_LINK constant.', 'fa-info-circle');
+      }
+    });
+
     document.getElementById('closeCheckoutPreview')?.addEventListener('click', renderCartModal);
     document.getElementById('modalOverlay')?.classList.add('active');
   }
@@ -1742,6 +1814,10 @@ function renderSamples() {
   attachBeatCardEvents(grid);
 }
 
+// Virtual scrolling state: tracks how many cards are currently rendered
+const BEATS_PER_BATCH = 20;
+let _beatStoreObserver = null; // IntersectionObserver for load-more sentinel
+
 function renderBeatStore() {
   console.log('🔄 renderBeatStore called');
   
@@ -1763,13 +1839,17 @@ function renderBeatStore() {
       state.searchQuery ? 'No matching beats' : 'No beats yet',
       state.searchQuery ? 'Try another search term.' : 'Featured beats will appear here.'
     );
-    // Still need to attach listeners for empty state
     attachBeatCardEvents(grid);
     return;
   }
 
-  // Build the HTML directly on the existing grid
-  grid.innerHTML = beats.map(beat => `
+  // Disconnect any previous scroll observer to avoid stale references
+  if (_beatStoreObserver) { _beatStoreObserver.disconnect(); _beatStoreObserver = null; }
+
+  let rendered = 0;
+
+  function buildCardHTML(beat) {
+    return `
     <div class="beat-card" data-beat-id="${beat.id}">
       <div class="beat-card-art">
         <img src="${beat.artwork}" alt="${beat.title}" loading="lazy" />
@@ -1786,15 +1866,48 @@ function renderBeatStore() {
           <span>Add to Cart</span>
         </button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }
 
-  console.log('✅ Grid HTML built, attaching events...');
-  
-  // Attach events to the grid
-  attachBeatCardEvents(grid);
+  function appendNextBatch() {
+    const nextBatch = beats.slice(rendered, rendered + BEATS_PER_BATCH);
+    if (nextBatch.length === 0) return;
+    const fragment = document.createDocumentFragment();
+    nextBatch.forEach(beat => {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildCardHTML(beat).trim();
+      fragment.appendChild(tmp.firstChild);
+    });
+    // Remove existing sentinel before appending new cards
+    const oldSentinel = grid.querySelector('.beat-load-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+    grid.appendChild(fragment);
+    rendered += nextBatch.length;
+    attachBeatCardEvents(grid);
+    updateCartButtons();
+    // Re-attach sentinel if more cards remain
+    if (rendered < beats.length) {
+      const sentinel = document.createElement('div');
+      sentinel.className = 'beat-load-sentinel';
+      sentinel.style.cssText = 'height:1px;grid-column:1/-1;';
+      grid.appendChild(sentinel);
+      _beatStoreObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          _beatStoreObserver.disconnect();
+          _beatStoreObserver = null;
+          appendNextBatch();
+        }
+      }, { rootMargin: '200px' });
+      _beatStoreObserver.observe(sentinel);
+    }
+  }
+
+  // Initial render — clear grid and load first batch
+  grid.innerHTML = '';
+  rendered = 0;
+  appendNextBatch();
+
   state.currentPlaylist = 'featured';
-  
   console.log('✅ renderBeatStore complete');
 }
 
@@ -1871,7 +1984,7 @@ function renderBeatTapes() {
 function renderSamples() {
   const grid = document.getElementById('samplesGrid');
   if (!grid) return;
-  renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', 'This tab is ready for Airtable sample data when you are.');
+  renderEmptyState(grid, 'fa-box-open', 'Samples coming soon', '');
 }
 
 // Helper: Attach events to beat cards
@@ -1968,34 +2081,77 @@ function showCheckoutModal(beat) {
 
   modalBox.innerHTML = `
     <h2>License Preview</h2>
-    <p class="sub">You're reviewing the Standard License for "${beat.title}"</p>
+    <p class="sub">Standard License for "${beat.title}"</p>
     
-    <div style="text-align:center;margin:20px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
+    <div style="text-align:center;margin:16px 0;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;">
       <div style="font-size:48px;font-weight:800;color:var(--accent);">$${BEAT_PRICE.toFixed(2)}</div>
       <div style="font-size:13px;color:var(--text-muted);">Standard License</div>
     </div>
 
-    <div class="cart-license-note" style="margin-bottom:16px;">
-      <strong>Terms & Conditions</strong>
-      <span>All beat sales are Standard License — $${BEAT_PRICE.toFixed(2)} each.</span>
+    <div id="tcScroll" style="max-height:180px;overflow-y:auto;background:rgba(255,255,255,0.04);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 12px;">
+      <p style="margin:0 0 8px;"><strong>Price:</strong> $19.99 per beat</p>
+      <p style="margin:0 0 4px;"><strong>✅ WHAT YOU CAN DO:</strong></p>
+      <ul style="margin:0 0 10px;padding-left:18px;">
+        <li>Use in YouTube, Instagram, TikTok, Facebook, and similar platforms</li>
+        <li>Use in podcasts and streaming audio content</li>
+        <li>Monetize your content (up to 1,000,000 streams/views)</li>
+        <li>Use in 1 commercial project (one song, video, or campaign)</li>
+        <li>Worldwide, lifetime usage rights</li>
+        <li>Post on Spotify, Apple Music, SoundCloud (with credits)</li>
+      </ul>
+      <p style="margin:0 0 4px;"><strong>❌ WHAT YOU CANNOT DO:</strong></p>
+      <ul style="margin:0 0 10px;padding-left:18px;">
+        <li>Claim ownership or register with a PRO (BMI, ASCAP, etc.)</li>
+        <li>Resell or distribute the beat as your own</li>
+        <li>Use in TV, film, or video games (requires exclusive license)</li>
+        <li>Sample or remix without permission</li>
+        <li>Transfer the license or use in multiple projects</li>
+      </ul>
+      <p style="margin:0 0 4px;"><strong>📋 ADDITIONAL TERMS:</strong></p>
+      <ul style="margin:0;padding-left:18px;">
+        <li><strong>Credit Required:</strong> Credit "MarcDBeats" in description/metadata.</li>
+        <li><strong>Non-Exclusive:</strong> Beat may be sold to other artists. For exclusive rights, contact admin@marcdbeats.com.</li>
+        <li><strong>Refund Policy:</strong> All sales are final.</li>
+        <li><strong>Liability:</strong> MarcDBeats is not responsible for claims arising from your use.</li>
+      </ul>
+    </div>
+
+    <div class="cart-license-note" style="margin:0 0 12px;">
       <span>For exclusive beats, email admin@marcdbeats.com.</span>
     </div>
 
-    <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;">
-      <i class="fas fa-lock"></i> Payment Coming Soon
+    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:6px 0 12px;font-size:14px;color:var(--text-secondary);">
+      <input type="checkbox" id="tcAgreeSingle" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:var(--accent);" />
+      I have read and agree to the Standard License Terms & Conditions above.
+    </label>
+
+    <button class="btn-primary" id="checkoutBtn" style="width:100%;padding:14px;border:none;border-radius:14px;background:var(--gradient-1);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:0.2s;" disabled>
+      <i class="fas fa-lock"></i> Proceed to Payment
     </button>
     <button class="btn-secondary" id="cancelCheckout" style="width:100%;padding:14px;border:1px solid var(--border-subtle);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;transition:0.2s;margin-top:8px;">
       Cancel
     </button>
   `;
 
+  const agreeBox = document.getElementById('tcAgreeSingle');
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  agreeBox.addEventListener('change', function() { checkoutBtn.disabled = !this.checked; });
+
   document.getElementById('cancelCheckout').addEventListener('click', () => {
     document.getElementById('modalOverlay').classList.remove('active');
   });
 
-  document.getElementById('checkoutBtn').addEventListener('click', async () => {
-    showToast('Payment processing will be enabled after the UI review.', 'fa-info-circle');
-    document.getElementById('modalOverlay').classList.remove('active');
+  checkoutBtn.addEventListener('click', async () => {
+    if (!agreeBox.checked) return;
+    if (STRIPE_PAYMENT_LINK) {
+      const url = new URL(STRIPE_PAYMENT_LINK);
+      url.searchParams.set('client_reference_id', beat.id);
+      document.getElementById('modalOverlay').classList.remove('active');
+      window.open(url.toString(), '_blank');
+    } else {
+      showToast('Payment link not configured — see STRIPE_PAYMENT_LINK constant.', 'fa-info-circle');
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
   });
 
   document.getElementById('modalOverlay').classList.add('active');
@@ -2006,7 +2162,7 @@ function showCheckoutModal(beat) {
   // =============================================================
   // Single DOMContentLoaded handler — all event wiring lives here
   // so DOM elements are guaranteed to exist before we query them.
-  let _muteBtnInserted = false; // guard against duplicate mute button insertion
+  
   document.addEventListener('DOMContentLoaded', function() {
     logger.info('app:dom-ready');
 
@@ -2045,9 +2201,10 @@ function showCheckoutModal(beat) {
     document.getElementById('portalNavBtn')?.addEventListener('click', showPortal);
     document.getElementById('portalBack')?.addEventListener('click', closeAllViews);
 
-    document.getElementById('spotifyPlayer')?.addEventListener('click', (e) => {
-  // Don't open if clicking on buttons OR if the full player is already open
-  if (e.target.closest('button')) return;
+    // Clicking the artwork/title area (mini-player-open) opens the full player.
+    // The play/pause and prev/next buttons are NOT inside mini-player-open, so
+    // pausing the track will never accidentally trigger the full player.
+    document.querySelector('.mini-player-open')?.addEventListener('click', () => {
   if (document.getElementById('fullPlayerOverlay').classList.contains('active')) return;
   if (state.currentBeat) {
     openFullPlayer();
@@ -2237,72 +2394,13 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
       }
     });
 
-    // ---- Volume control with persistence ----
-    // Restore saved volume on app start; clamp to [0, 1] to guard against bad data
+    // ---- Volume control: restore saved level from localStorage ----
+    // The full player volume UI was removed, but we still restore the saved
+    // volume on audio element so hardware controls reflect the user's preference.
     const _rawVol = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
     const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
-    const _volSlider = document.getElementById('fullVolumeSlider');
-    const _volRow = document.querySelector('.full-player-volume');
-
-    // Feature-detect whether programmatic volume control is supported.
-    // Desktop browsers and Android Chrome/WebView support it fully.
-    // iOS Safari silently ignores audio.volume — volume is hardware-only on iOS.
-    // Two probe values (0.123 and 0.879) are chosen to be far from common default volumes
-    // (0, 0.5, 1.0) so they are unlikely to coincidentally match the real volume, preventing
-    // false negatives. We pick whichever probe differs from the current volume to ensure
-    // the test represents a genuine change, then verify the element actually adopted it.
-    let _volumeControlSupported = true;
     if (_audioEl) {
-      const _prevVol = _audioEl.volume;
-      const _probeA = 0.123, _probeB = 0.879;
-      const _probe = (_prevVol !== _probeA) ? _probeA : _probeB;
-      _audioEl.volume = _probe;
-      _volumeControlSupported = Math.abs(_audioEl.volume - _probe) < 0.01;
-      _audioEl.volume = _prevVol; // restore
-    }
-
-    if (!_volumeControlSupported && _volRow) {
-      // Programmatic volume not supported (iOS) — hide slider, show mute toggle
-      _volRow.classList.add('ios-volume-hidden');
-      const _muteBtn = document.createElement('button');
-      _muteBtn.id = 'iosMuteBtn';
-      _muteBtn.className = 'mute-toggle-btn';
-      _muteBtn.setAttribute('aria-label', 'Mute / Unmute');
-      _muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-      _muteBtn.addEventListener('click', function() {
-        if (_audioEl) {
-          _audioEl.muted = !_audioEl.muted;
-          _muteBtn.innerHTML = _audioEl.muted
-            ? '<i class="fas fa-volume-mute"></i>'
-            : '<i class="fas fa-volume-up"></i>';
-          _muteBtn.classList.toggle('muted', _audioEl.muted);
-        }
-      });
-      const _actionsRow = document.getElementById('fullPlayerActions');
-      if (_actionsRow && !_muteBtnInserted) {
-        _actionsRow.appendChild(_muteBtn);
-        _muteBtnInserted = true;
-      }
-    } else {
-      if (_volSlider) {
-        _volSlider.value = _savedVolume;
-        _volSlider.style.setProperty('--range-progress', `${_savedVolume * 100}%`);
-      }
-      if (_audioEl) _audioEl.volume = _savedVolume;
-
-      _volSlider?.addEventListener('input', function() {
-        const vol = parseFloat(this.value);
-        if (_audioEl) _audioEl.volume = vol;
-        // Persist volume across sessions
-        localStorage.setItem('marcdbeats_volume', this.value);
-        this.style.setProperty('--range-progress', `${vol * 100}%`);
-        const icon = document.getElementById('volumeIcon');
-        if (icon) {
-          if (vol === 0) icon.className = 'fas fa-volume-mute';
-          else if (vol < 0.5) icon.className = 'fas fa-volume-down';
-          else icon.className = 'fas fa-volume-up';
-        }
-      });
+      try { _audioEl.volume = _savedVolume; } catch (e) { /* iOS ignores programmatic volume */ }
     }
 
     // Swipe down to close full player
@@ -2639,7 +2737,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     .toast { position: absolute; bottom: 90px; left: 20px; right: 20px; background: rgba(0,0,0,0.88); backdrop-filter: blur(16px); padding: 14px 20px; border-radius: 16px; text-align: center; font-size: 14px; border: 1px solid rgba(220, 38, 38, 0.2); transform: translateY(80px); opacity: 0; transition: 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28); pointer-events: none; z-index: 60; color: var(--text-primary); }
     .toast.show { transform: translateY(0); opacity: 1; }
     .toast i { margin-right: 8px; color: var(--accent); }
-    .modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 50; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 300; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal-overlay.active { display: flex; }
     .modal-box { background: var(--bg-card); border-radius: 28px; max-width: 400px; width: 100%; padding: 32px 24px 28px; border: 1px solid var(--border-subtle); box-shadow: 0 40px 80px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto; }
     .modal-box h2 { font-size: 22px; margin-bottom: 4px; letter-spacing: -0.3px; }
@@ -4046,13 +4144,6 @@ input[type="range"]:focus-visible {
 }
 .cart-license-note strong { color: var(--text-primary); }
 
-.full-player-volume {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px 20px;
-}
-.full-player-volume i { color: var(--text-muted); }
 .full-player-actions {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -4316,10 +4407,6 @@ input[type="range"]:focus-visible {
     </div>
     
     <!-- Bottom Actions -->
-    <div class="full-player-volume">
-      <i class="fas fa-volume-up" id="volumeIcon" aria-hidden="true"></i>
-      <input type="range" id="fullVolumeSlider" class="volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
-    </div>
 
     <div class="full-player-actions" id="fullPlayerActions">
       <button id="fullPlayerAddToCart" aria-label="Add to cart"><i class="fas fa-cart-plus" aria-hidden="true"></i><span>Add to Cart</span></button>
