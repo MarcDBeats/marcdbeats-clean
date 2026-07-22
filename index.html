@@ -213,6 +213,7 @@
   });
   
   Object.keys(seriesMap).forEach(key => {
+    // Sort descending (highest series number first); items without a number use 0 so they appear last
     seriesMap[key].sort((a, b) => {
       return (b.seriesNumber || 0) - (a.seriesNumber || 0);
     });
@@ -1166,8 +1167,9 @@ function renderCard(beat, index, queue) {
         // Redirect to Stripe Payment Link — quantity param lets user adjust on Stripe page
         const url = new URL(STRIPE_PAYMENT_LINK);
         url.searchParams.set('quantity', state.cart.length);
-        // Pass beat titles as a client reference (visible in Stripe dashboard)
-        url.searchParams.set('client_reference_id', state.cart.map(b => b.id).join('_'));
+        // Pass first beat ID as client reference (visible in Stripe dashboard); truncated to avoid URL length limits
+        const ref = state.cart.map(b => b.id).join('_').substring(0, 100);
+        url.searchParams.set('client_reference_id', ref);
         document.getElementById('modalOverlay')?.classList.remove('active');
         window.open(url.toString(), '_blank');
       } else {
@@ -1817,6 +1819,7 @@ function renderSamples() {
 // Virtual scrolling state: tracks how many cards are currently rendered
 const BEATS_PER_BATCH = 20;
 let _beatStoreObserver = null; // IntersectionObserver for load-more sentinel
+let _beatStoreRenderGen = 0;  // Incremented on each full render to invalidate stale observers
 
 function renderBeatStore() {
   console.log('🔄 renderBeatStore called');
@@ -1845,6 +1848,7 @@ function renderBeatStore() {
 
   // Disconnect any previous scroll observer to avoid stale references
   if (_beatStoreObserver) { _beatStoreObserver.disconnect(); _beatStoreObserver = null; }
+  const _renderGen = ++_beatStoreRenderGen; // capture this render's generation
 
   let rendered = 0;
 
@@ -1870,6 +1874,8 @@ function renderBeatStore() {
   }
 
   function appendNextBatch() {
+    // If renderBeatStore was called again since this batch started, abort
+    if (_renderGen !== _beatStoreRenderGen) return;
     const nextBatch = beats.slice(rendered, rendered + BEATS_PER_BATCH);
     if (nextBatch.length === 0) return;
     const fragment = document.createDocumentFragment();
@@ -1892,7 +1898,7 @@ function renderBeatStore() {
       sentinel.style.cssText = 'height:1px;grid-column:1/-1;';
       grid.appendChild(sentinel);
       _beatStoreObserver = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries.length > 0 && entries[0].isIntersecting) {
           _beatStoreObserver.disconnect();
           _beatStoreObserver = null;
           appendNextBatch();
@@ -2400,7 +2406,7 @@ document.getElementById('homeNavBtn')?.addEventListener('click', () => {
     const _rawVol = parseFloat(localStorage.getItem('marcdbeats_volume') ?? '1');
     const _savedVolume = Number.isNaN(_rawVol) ? 1 : Math.min(1, Math.max(0, _rawVol));
     if (_audioEl) {
-      try { _audioEl.volume = _savedVolume; } catch (e) { /* iOS ignores programmatic volume */ }
+      _audioEl.volume = _savedVolume; // iOS silently ignores programmatic volume (no error thrown)
     }
 
     // Swipe down to close full player
