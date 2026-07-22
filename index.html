@@ -93,14 +93,11 @@
   const stripe = window.Stripe ? Stripe(STRIPE_PUBLISHABLE_KEY) : null;
 
   // =============================================================
-  // 💳 STRIPE PAYMENT LINK
-  // To accept payments:
-  //   1. Go to dashboard.stripe.com → Payment Links → Create link
-  //   2. Add your "Standard License – $19.99" product
-  //   3. Enable "Allow customers to adjust quantity"
-  //   4. Paste the generated link below (format: https://buy.stripe.com/XXXXXXXX)
+  // 💳 STRIPE CHECKOUT SESSION API
+  // Set STRIPE_SECRET_KEY in Vercel and this endpoint will create
+  // dynamic Stripe Checkout Sessions with beat metadata.
   // =============================================================
-  const STRIPE_PAYMENT_LINK = ''; // ← Paste your Stripe Payment Link here
+  const CHECKOUT_SESSION_API = '/api/create-checkout-session';
   
   // =============================================================
   // 📦 STATE
@@ -1089,6 +1086,57 @@ function renderCard(beat, index, queue) {
     updateCartTotal();
   }
 
+  async function startStripeCheckout(beats) {
+    if (!stripe) {
+      showToast('Stripe is unavailable right now. Please refresh and try again.', 'fa-exclamation-circle');
+      return;
+    }
+
+    const safeBeats = (Array.isArray(beats) ? beats : [])
+      .map(beat => ({
+        id: beat?.id || '',
+        title: beat?.title || 'Untitled Beat',
+        artist: beat?.artist || 'MarcDBeats'
+      }))
+      .filter(beat => beat.id);
+
+    if (safeBeats.length === 0) {
+      showToast('No valid beats selected for checkout.', 'fa-exclamation-circle');
+      return;
+    }
+
+    const modalOverlay = document.getElementById('modalOverlay');
+    const clientReferenceId = safeBeats.map(beat => beat.id).join('_').substring(0, 100);
+    const unitAmount = Math.round(BEAT_PRICE * 100);
+
+    try {
+      const response = await fetch(CHECKOUT_SESSION_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          beats: safeBeats,
+          unitAmount,
+          clientReferenceId,
+          memberId: state.user?.id || '',
+          origin: window.location.origin
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data?.sessionId) {
+        throw new Error(data?.error || 'Could not start Stripe checkout.');
+      }
+
+      modalOverlay?.classList.remove('active');
+      const result = await stripe.redirectToCheckout({ sessionId: data.sessionId });
+      if (result?.error?.message) {
+        showToast(result.error.message, 'fa-exclamation-circle');
+      }
+    } catch (error) {
+      showToast(error.message || 'Checkout failed. Please try again.', 'fa-exclamation-circle');
+    }
+  }
+
   function showCartCheckout() {
     if (state.cart.length === 0) {
       showToast('Your cart is empty', 'fa-exclamation-circle');
@@ -1161,20 +1209,9 @@ function renderCard(beat, index, queue) {
       payBtn.disabled = !this.checked;
     });
 
-    payBtn.addEventListener('click', () => {
+    payBtn.addEventListener('click', async () => {
       if (!agreeBox.checked) return;
-      if (STRIPE_PAYMENT_LINK) {
-        // Redirect to Stripe Payment Link — quantity param lets user adjust on Stripe page
-        const url = new URL(STRIPE_PAYMENT_LINK);
-        url.searchParams.set('quantity', state.cart.length);
-        // Pass first beat ID as client reference (visible in Stripe dashboard); truncated to avoid URL length limits
-        const ref = state.cart.map(b => b.id).join('_').substring(0, 100);
-        url.searchParams.set('client_reference_id', ref);
-        document.getElementById('modalOverlay')?.classList.remove('active');
-        window.open(url.toString(), '_blank');
-      } else {
-        showToast('Payment link not configured — see STRIPE_PAYMENT_LINK constant.', 'fa-info-circle');
-      }
+      await startStripeCheckout(state.cart);
     });
 
     document.getElementById('closeCheckoutPreview')?.addEventListener('click', renderCartModal);
@@ -2149,15 +2186,7 @@ function showCheckoutModal(beat) {
 
   checkoutBtn.addEventListener('click', async () => {
     if (!agreeBox.checked) return;
-    if (STRIPE_PAYMENT_LINK) {
-      const url = new URL(STRIPE_PAYMENT_LINK);
-      url.searchParams.set('client_reference_id', beat.id);
-      document.getElementById('modalOverlay').classList.remove('active');
-      window.open(url.toString(), '_blank');
-    } else {
-      showToast('Payment link not configured — see STRIPE_PAYMENT_LINK constant.', 'fa-info-circle');
-      document.getElementById('modalOverlay').classList.remove('active');
-    }
+    await startStripeCheckout([beat]);
   });
 
   document.getElementById('modalOverlay').classList.add('active');
